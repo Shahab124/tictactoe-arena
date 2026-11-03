@@ -1,5 +1,5 @@
 name: game_engine
-description: Game rules: boards, legal moves, and win and draw detection.
+description: "Game rules: boards, legal moves, and win and draw detection."
 publish_to: none
 version: 0.1.0
 

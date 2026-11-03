@@ -1,5 +1,5 @@
 name: game_ai
-description: Game AI: returns one legal move through a documented interface.
+description: "Game AI: returns one legal move through a documented interface."
 publish_to: none
 version: 0.1.0
 
