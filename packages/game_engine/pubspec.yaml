@@ -1,0 +1,10 @@
+name: game_engine
+description: "Game rules: boards, legal moves, and win and draw detection."
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.5.0
+
+dev_dependencies:
+  test: ^1.25.0
