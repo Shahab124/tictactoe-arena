@@ -5,7 +5,33 @@ Built by Team Alpha for Software Engineering, Fall 2026 (PUCIT).
 
 **Team:** Muhammad Shahab (BSDSF24A032), Daniyal Usman (BSDSF24A025), Muhammad Samiullah (BSDSF24A013)
 **Task board:** Jira project `SCRUM` (Kanban)
-**Planned stack:** Flutter + Firebase, pending team confirmation
+**Stack:** Flutter + Firebase
+
+## Project structure
+
+- `lib/`: the Game Platform app
+- `packages/game_engine/`: game rules
+- `packages/game_ai/`: the Game AI, kept separate so groups can exchange components
+
+## Build and run
+
+Install [Flutter](https://docs.flutter.dev/get-started/install), then from the repo root:
+
+```bash
+flutter create --platforms=android,ios,web,windows --project-name tictactoe_arena .
+flutter pub get
+flutter run -d chrome
+```
+
+Run the tests:
+
+```bash
+flutter test
+cd packages/game_engine && dart pub get && dart test && cd ../..
+cd packages/game_ai && dart pub get && dart test && cd ../..
+```
+
+GitHub runs these tests automatically on every pull request.
 
 ## How we work
 
