@@ -31,7 +31,3 @@ Never commit directly to `main`.
 4. On GitHub, open a pull request with the ticket key in its title, then move the ticket to **In Review**.
 5. A different team member reviews and approves it. The tests must pass.
 6. Merge the pull request and move the ticket to **Done**.
-
-## AI assistance
-
-Commits written with Claude carry a `Co-Authored-By: Claude` line, in line with the disclosure rule in our Group Agreement (D1).
