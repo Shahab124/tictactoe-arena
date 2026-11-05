@@ -30,6 +30,14 @@ jobs:
         run: flutter analyze
       - name: Test app
         run: flutter test
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Test database rules
+        run: |
+          npm ci --prefix firestore
+          npx --yes firebase-tools@15 emulators:exec --project demo-tictactoe-arena --only firestore "npm test --prefix firestore"
       - name: Build web version
         run: |
           flutter create --platforms=web --project-name tictactoe_arena .

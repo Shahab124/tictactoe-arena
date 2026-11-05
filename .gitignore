@@ -13,3 +13,5 @@ windows/
 macos/
 linux/
 .metadata
+.flutter-plugins-dependencies
+node_modules/

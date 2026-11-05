@@ -7,6 +7,8 @@ environment:
   sdk: ^3.5.0
 
 dependencies:
+  firebase_auth: ^7.0.1
+  firebase_core: ^5.1.0
   flutter:
     sdk: flutter
   game_ai:
@@ -15,9 +17,11 @@ dependencies:
     path: packages/game_engine
 
 dev_dependencies:
+  firebase_auth_mocks: ^0.16.0
   flutter_lints: ^5.0.0
   flutter_test:
     sdk: flutter
+  mock_exceptions: ^0.8.2
 
 flutter:
   uses-material-design: true

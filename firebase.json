@@ -1,0 +1,34 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "tictactoe-arena-9ece4",
+          "appId": "1:1081964274804:android:c921f1220e33a22b345d21",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "tictactoe-arena-9ece4",
+          "configurations": {
+            "android": "1:1081964274804:android:c921f1220e33a22b345d21",
+            "web": "1:1081964274804:web:23c3efd16e4bf0fe345d21",
+            "windows": "1:1081964274804:web:1eed5d870bbe4de4345d21"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore/firestore.rules"
+  },
+  "emulators": {
+    "firestore": {
+      "port": 8181
+    },
+    "ui": {
+      "enabled": false
+    }
+  }
+}
