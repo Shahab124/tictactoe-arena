@@ -33,6 +33,10 @@ cd packages/game_ai && dart pub get && dart test && cd ../..
 
 GitHub runs these tests automatically on every pull request.
 
+## Download the app
+
+Every pull request and every merge to `main` also builds a release Android APK and the web version. Open the **Actions** tab on GitHub, pick the latest **CI** run on `main`, and download `tictactoe-arena-apk` or `tictactoe-arena-web` under **Artifacts** (you must be signed in to GitHub). Unzip the APK artifact and open `app-release.apk` on an Android phone to install it (allow installs from unknown sources). Each build has a new signature, so uninstall the old version before installing a new one.
+
 ## How we work
 
 Never commit directly to `main`.
