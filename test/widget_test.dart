@@ -1,9 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_auth_mocks/firebase_auth_mocks.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mock_exceptions/mock_exceptions.dart';
 import 'package:tictactoe_arena/auth/sign_in_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tictactoe_arena/data/game_store.dart';
 import 'package:tictactoe_arena/main.dart';
 
 Future<void> enter(WidgetTester tester, String email, String password) async {
@@ -11,9 +14,20 @@ Future<void> enter(WidgetTester tester, String email, String password) async {
   await tester.enterText(find.widgetWithText(TextField, 'Password'), password);
 }
 
+Future<Widget> app(FirebaseAuth auth) async {
+  SharedPreferences.setMockInitialValues({});
+  return TicTacToeArenaApp(
+    auth: auth,
+    store: GameStore(
+      firestore: FakeFirebaseFirestore(),
+      prefs: await SharedPreferences.getInstance(),
+    ),
+  );
+}
+
 void main() {
   testWidgets('starts on the sign-in screen', (tester) async {
-    await tester.pumpWidget(TicTacToeArenaApp(auth: MockFirebaseAuth()));
+    await tester.pumpWidget(await app(MockFirebaseAuth()));
     await tester.pump();
     expect(find.text('Sign in'), findsOneWidget);
     expect(find.text('Play as guest'), findsOneWidget);
@@ -21,7 +35,7 @@ void main() {
 
   testWidgets('create account signs the player in', (tester) async {
     final auth = MockFirebaseAuth();
-    await tester.pumpWidget(TicTacToeArenaApp(auth: auth));
+    await tester.pumpWidget(await app(auth));
     await tester.pump();
     await enter(tester, 'ayesha@example.com', 'secret123');
     await tester.tap(find.text('Create account'));
@@ -32,7 +46,7 @@ void main() {
 
   testWidgets('sign in with email works and sign out returns', (tester) async {
     final auth = MockFirebaseAuth(mockUser: MockUser(email: 'omar@example.com'));
-    await tester.pumpWidget(TicTacToeArenaApp(auth: auth));
+    await tester.pumpWidget(await app(auth));
     await tester.pump();
     await enter(tester, 'omar@example.com', 'secret123');
     await tester.tap(find.text('Sign in'));
@@ -48,7 +62,7 @@ void main() {
   testWidgets('a signed-in player stays signed in on launch', (tester) async {
     final auth = MockFirebaseAuth(
         signedIn: true, mockUser: MockUser(email: 'sara@example.com'));
-    await tester.pumpWidget(TicTacToeArenaApp(auth: auth));
+    await tester.pumpWidget(await app(auth));
     await tester.pumpAndSettle();
     expect(find.text('Playing as sara@example.com'), findsOneWidget);
   });
@@ -58,7 +72,7 @@ void main() {
     whenCalling(Invocation.method(#signInWithEmailAndPassword, null))
         .on(auth)
         .thenThrow(FirebaseAuthException(code: 'invalid-credential'));
-    await tester.pumpWidget(TicTacToeArenaApp(auth: auth));
+    await tester.pumpWidget(await app(auth));
     await tester.pump();
     await enter(tester, 'omar@example.com', 'nope');
     await tester.tap(find.text('Sign in'));
@@ -69,7 +83,7 @@ void main() {
 
   testWidgets('guest play opens the app without an account', (tester) async {
     final auth = MockFirebaseAuth();
-    await tester.pumpWidget(TicTacToeArenaApp(auth: auth));
+    await tester.pumpWidget(await app(auth));
     await tester.pump();
     await tester.tap(find.text('Play as guest'));
     await tester.pumpAndSettle();
@@ -78,7 +92,7 @@ void main() {
   });
 
   testWidgets('password reset needs an email, then confirms', (tester) async {
-    await tester.pumpWidget(TicTacToeArenaApp(auth: MockFirebaseAuth()));
+    await tester.pumpWidget(await app(MockFirebaseAuth()));
     await tester.pump();
     await tester.tap(find.text('Forgot password?'));
     await tester.pump();
