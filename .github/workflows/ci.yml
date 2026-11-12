@@ -13,6 +13,9 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # ponytail: pinned to match the team's laptops; Flutter 3.50 deprecates
+          # package:flutter/material.dart, so bump this together with that migration.
+          flutter-version: 3.47.9
           cache: true
       - name: Test game engine
         working-directory: packages/game_engine
@@ -47,6 +50,9 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # ponytail: pinned to match the team's laptops; Flutter 3.50 deprecates
+          # package:flutter/material.dart, so bump this together with that migration.
+          flutter-version: 3.47.9
           cache: true
       - uses: actions/setup-java@v4
         with:
