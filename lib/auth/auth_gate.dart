@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../data/game_store.dart';
+import '../data/history_screen.dart';
 import 'sign_in_screen.dart';
 
 /// Shows the sign-in screen until the player signs in or chooses guest play.
@@ -8,9 +10,10 @@ import 'sign_in_screen.dart';
 /// Firebase keeps the player signed in between app launches, and the same
 /// account works on every device (REQ-ACC-04).
 class AuthGate extends StatefulWidget {
-  const AuthGate({super.key, required this.auth});
+  const AuthGate({super.key, required this.auth, required this.store});
 
   final FirebaseAuth auth;
+  final GameStore store;
 
   @override
   State<AuthGate> createState() => _AuthGateState();
@@ -38,6 +41,9 @@ class _AuthGateState extends State<AuthGate> {
             setState(() => _guest = false);
             await widget.auth.signOut();
           },
+          onHistory: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) =>
+                  HistoryScreen(store: widget.store, uid: user?.uid))),
         );
       },
     );
@@ -46,10 +52,16 @@ class _AuthGateState extends State<AuthGate> {
 
 /// Placeholder home until the game screen (SCRUM-14) is merged.
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key, required this.name, required this.onSignOut});
+  const HomeScreen({
+    super.key,
+    required this.name,
+    required this.onSignOut,
+    required this.onHistory,
+  });
 
   final String name;
   final VoidCallback onSignOut;
+  final VoidCallback onHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +72,19 @@ class HomeScreen extends StatelessWidget {
           TextButton(onPressed: onSignOut, child: const Text('Sign out')),
         ],
       ),
-      body: Center(child: Text('Playing as $name')),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Playing as $name'),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: onHistory,
+              child: const Text('History & statistics'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

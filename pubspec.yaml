@@ -7,6 +7,7 @@ environment:
   sdk: ^3.5.0
 
 dependencies:
+  cloud_firestore: ^7.1.0
   firebase_auth: ^7.0.1
   firebase_core: ^5.1.0
   flutter:
@@ -15,8 +16,10 @@ dependencies:
     path: packages/game_ai
   game_engine:
     path: packages/game_engine
+  shared_preferences: ^2.5.6
 
 dev_dependencies:
+  fake_cloud_firestore: ^4.5.0
   firebase_auth_mocks: ^0.16.0
   flutter_lints: ^5.0.0
   flutter_test:
