@@ -33,8 +33,13 @@ Map<String, Object> requestMove(Map<String, dynamic> request, {Random? random}) 
     return _error('GAME_OVER', 'The game is already won or the board is full.');
   }
 
+  final rnd = random ?? Random();
+  final win = winLength;
+  final me = side as String;
   final (row, col) = switch (difficulty) {
-    'easy' => _easy(cells, random ?? Random()),
+    'easy' => _easy(cells, rnd),
+    'medium' => _medium(cells, me, win, rnd),
+    'hard' => cells.length == 3 ? _hard3x3(cells, me) : _medium(cells, me, win, rnd),
     _ => throw UnimplementedError(), // unreachable: _validate rejects these
   };
   return {'row': row, 'col': col};
@@ -45,6 +50,58 @@ Map<String, Object> requestMove(Map<String, dynamic> request, {Random? random}) 
   final empty = _empty(cells);
   return empty[random.nextInt(empty.length)];
 }
+
+// Medium: takes a win, else blocks the opponent's win, else plays at random,
+// so it misses forks and can still lose (REQ-AI-03).
+(int, int) _medium(List<List<String>> cells, String me, int win, Random random) =>
+    _winningMove(cells, me, win) ??
+    _winningMove(cells, _other(me), win) ??
+    _easy(cells, random);
+
+(int, int)? _winningMove(List<List<String>> cells, String mark, int win) {
+  for (final (r, c) in _empty(cells)) {
+    cells[r][c] = mark;
+    final wins = _hasLine(cells, win);
+    cells[r][c] = '';
+    if (wins) return (r, c);
+  }
+  return null;
+}
+
+// Hard on 3×3: full minimax search, so it never loses (REQ-AI-04).
+// ponytail: on 8×8 Hard plays like Medium; SCRUM-20's Expert adds an 8×8 search.
+(int, int) _hard3x3(List<List<String>> cells, String me) {
+  var best = -1000;
+  late (int, int) bestMove;
+  for (final (r, c) in _empty(cells)) {
+    cells[r][c] = me;
+    final score = -_negamax(cells, _other(me), 1, -1000, 1000);
+    cells[r][c] = '';
+    if (score > best) {
+      best = score;
+      bestMove = (r, c);
+    }
+  }
+  return bestMove;
+}
+
+// Score for [toMove] with perfect play; faster wins and slower losses score
+// higher, so Hard wins as soon as it can.
+int _negamax(List<List<String>> cells, String toMove, int depth, int alpha, int beta) {
+  if (_hasLine(cells, 3)) return depth - 10; // the player who just moved won
+  final empty = _empty(cells);
+  if (empty.isEmpty) return 0;
+  for (final (r, c) in empty) {
+    cells[r][c] = toMove;
+    final score = -_negamax(cells, _other(toMove), depth + 1, -beta, -alpha);
+    cells[r][c] = '';
+    if (score > alpha) alpha = score;
+    if (alpha >= beta) break;
+  }
+  return alpha;
+}
+
+String _other(String mark) => mark == 'X' ? 'O' : 'X';
 
 Map<String, Object>? _validate(
     Object? board, Object? winLength, Object? side, Object? difficulty) {
@@ -75,8 +132,8 @@ Map<String, Object>? _validate(
     return _error('INVALID_DIFFICULTY',
         'difficulty must be one of ${difficulties.join(', ')}.');
   }
-  if (difficulty != 'easy') {
-    // ponytail: medium, hard and expert arrive in SCRUM-19 and SCRUM-20.
+  if (difficulty == 'expert') {
+    // Expert arrives in SCRUM-20.
     return _error(
         'UNSUPPORTED_DIFFICULTY', 'The $difficulty level is not available yet.');
   }
