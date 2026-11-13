@@ -40,7 +40,7 @@ Map<String, Object> requestMove(Map<String, dynamic> request, {Random? random}) 
     'easy' => _easy(cells, rnd),
     'medium' => _medium(cells, me, win, rnd),
     'hard' => cells.length == 3 ? _hard3x3(cells, me) : _medium(cells, me, win, rnd),
-    _ => throw UnimplementedError(), // unreachable: _validate rejects these
+    _ => cells.length == 3 ? _hard3x3(cells, me) : _expert(cells, me, win),
   };
   return {'row': row, 'col': col};
 }
@@ -69,7 +69,7 @@ Map<String, Object> requestMove(Map<String, dynamic> request, {Random? random}) 
 }
 
 // Hard on 3×3: full minimax search, so it never loses (REQ-AI-04).
-// ponytail: on 8×8 Hard plays like Medium; SCRUM-20's Expert adds an 8×8 search.
+// ponytail: on 8×8 Hard plays like Medium; Expert is the strong 8×8 level.
 (int, int) _hard3x3(List<List<String>> cells, String me) {
   var best = -1000;
   late (int, int) bestMove;
@@ -99,6 +99,64 @@ int _negamax(List<List<String>> cells, String toMove, int depth, int alpha, int 
     if (alpha >= beta) break;
   }
   return alpha;
+}
+
+// Expert on 8×8 (REQ-AI-05, 06): takes a win, blocks a win, then plays the
+// cell with the best line score for both sides, so it blocks open threes
+// before they become open fours and builds its own lines. One pass over the
+// board, so it answers in milliseconds, well inside the 2-second limit.
+// ponytail: scores unbroken runs only (misses split threats like X_XX);
+// add a short threat search if Expert needs to be stronger.
+(int, int) _expert(List<List<String>> cells, String me, int win) {
+  final winNow = _winningMove(cells, me, win) ?? _winningMove(cells, _other(me), win);
+  if (winNow != null) return winNow;
+  final mid = (cells.length - 1) / 2;
+  var best = double.negativeInfinity;
+  late (int, int) bestMove;
+  for (final (r, c) in _empty(cells)) {
+    // Own lines count a little more than blocking, so it attacks on a tie;
+    // the centre distance only breaks ties.
+    final score = 1.1 * _lineScore(cells, r, c, me, win) +
+        _lineScore(cells, r, c, _other(me), win) -
+        ((r - mid).abs() + (c - mid).abs()) / 100;
+    if (score > best) {
+      best = score;
+      bestMove = (r, c);
+    }
+  }
+  return bestMove;
+}
+
+// How strong [mark]'s lines through the empty cell (r, c) would be.
+double _lineScore(List<List<String>> cells, int r, int c, String mark, int win) {
+  final n = cells.length;
+  var total = 0.0;
+  for (final (dr, dc) in const [(0, 1), (1, 0), (1, 1), (1, -1)]) {
+    var run = 1, open = 0;
+    for (final sign in const [1, -1]) {
+      var k = 1;
+      while (true) {
+        final rr = r + sign * dr * k, cc = c + sign * dc * k;
+        if (rr < 0 || rr >= n || cc < 0 || cc >= n) break;
+        if (cells[rr][cc] == mark) {
+          run++;
+          k++;
+          continue;
+        }
+        if (cells[rr][cc] == '') open++;
+        break;
+      }
+    }
+    final left = win - run; // stones still missing from a win
+    if (open == 0 && left > 0) continue; // dead line
+    total += switch (left) {
+      <= 1 => open == 2 ? 50000.0 : 5000.0, // makes an open/closed four
+      2 => open == 2 ? 2000.0 : 200.0, // open three (for 5) blocks/builds
+      3 => open == 2 ? 100.0 : 10.0,
+      _ => open.toDouble(),
+    };
+  }
+  return total;
 }
 
 String _other(String mark) => mark == 'X' ? 'O' : 'X';
@@ -131,11 +189,6 @@ Map<String, Object>? _validate(
   if (!difficulties.contains(difficulty)) {
     return _error('INVALID_DIFFICULTY',
         'difficulty must be one of ${difficulties.join(', ')}.');
-  }
-  if (difficulty == 'expert') {
-    // Expert arrives in SCRUM-20.
-    return _error(
-        'UNSUPPORTED_DIFFICULTY', 'The $difficulty level is not available yet.');
   }
   final flat = [for (final row in board) ...row];
   final xs = flat.where((c) => c == 'X').length;
