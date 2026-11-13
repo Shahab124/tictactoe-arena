@@ -124,12 +124,9 @@ void main() {
           'GAME_OVER');
     });
 
-    test('levels not built yet say so instead of crashing', () {
-      expectError(req(empty(3), difficulty: 'expert'), 'UNSUPPORTED_DIFFICULTY');
-    });
   });
 
-  for (final level in ['medium', 'hard']) {
+  for (final level in ['medium', 'hard', 'expert']) {
     group(level, () {
       test('takes a winning move', () {
         final board = [
@@ -194,6 +191,87 @@ void main() {
     ];
     expect(requestMove(req(board, side: 'O', difficulty: null)),
         {'row': 0, 'col': 2});
+  });
+
+  group('expert on 8×8', () {
+    Map<String, Object> expert(List<List<String>> b, String side, {int win = 5}) =>
+        requestMove(req(b, winLength: win, side: side, difficulty: 'expert'));
+
+    test('stops an open three before it becomes an open four', () {
+      final board = empty(8);
+      for (var c = 2; c <= 4; c++) {
+        board[3][c] = 'O';
+      }
+      board[7][0] = 'X';
+      board[7][7] = 'X';
+      expect(expert(board, 'X').toString(),
+          anyOf('{row: 3, col: 1}', '{row: 3, col: 5}'));
+    });
+
+    test('with 4 in a row, blocks an open two before it becomes an open three', () {
+      final board = empty(8);
+      board[4][3] = 'O';
+      board[4][4] = 'O';
+      board[0][0] = 'X';
+      expect(expert(board, 'X', win: 4).toString(),
+          anyOf('{row: 4, col: 2}', '{row: 4, col: 5}'));
+    });
+
+    test('builds its own open three into an open four', () {
+      final board = empty(8);
+      for (var r = 2; r <= 4; r++) {
+        board[r][5] = 'X';
+      }
+      board[0][0] = 'O';
+      board[7][1] = 'O';
+      expect(expert(board, 'X').toString(),
+          anyOf('{row: 1, col: 5}', '{row: 5, col: 5}'));
+    });
+
+    test('takes its own win before blocking', () {
+      final board = empty(8);
+      for (var c = 0; c < 4; c++) {
+        board[1][c] = 'O';
+        board[6][c] = 'X';
+      }
+      expect(expert(board, 'X'), {'row': 6, 'col': 4});
+    });
+
+    for (final win in [4, 5]) {
+      test('never loses to Easy, each move well under 2 s ($win in a row)', () {
+        final random = Random(win);
+        var slowest = Duration.zero, wins = 0;
+        for (var game = 0; game < 20; game++) {
+          final board = empty(8);
+          final expertSide = game.isEven ? 'X' : 'O';
+          var turn = 'X';
+          while (true) {
+            final watch = Stopwatch()..start();
+            final move = requestMove(
+                req(board,
+                    winLength: win,
+                    side: turn,
+                    difficulty: turn == expertSide ? 'expert' : 'easy'),
+                random: random);
+            if (turn == expertSide && watch.elapsed > slowest) {
+              slowest = watch.elapsed;
+            }
+            if (move['error'] == 'GAME_OVER') break;
+            board[move['row'] as int][move['col'] as int] = turn;
+            turn = turn == 'X' ? 'O' : 'X';
+          }
+          // Game over with empty cells left means the side that just moved won.
+          // ponytail: a full board is counted as neither (rare against Easy).
+          if (board.any((row) => row.contains(''))) {
+            final last = turn == 'X' ? 'O' : 'X';
+            expect(last, expertSide, reason: 'Expert lost game $game: $board');
+            wins++;
+          }
+        }
+        expect(wins, greaterThan(15), reason: 'Expert won $wins/20');
+        expect(slowest, lessThan(const Duration(seconds: 2)));
+      });
+    }
   });
 
   group('hard never loses on 3×3', () {
