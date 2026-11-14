@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'auth/auth_gate.dart';
 import 'data/game_store.dart';
 import 'firebase_options.dart';
+import 'ui/theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,7 +34,10 @@ class TicTacToeArenaApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'TicTacToe Arena',
-      theme: ThemeData(colorSchemeSeed: Colors.indigo),
+      debugShowCheckedModeBanner: false,
+      theme: arenaTheme(Brightness.light),
+      darkTheme: arenaTheme(Brightness.dark),
+      builder: (context, child) => ArenaBackground(child: child!),
       home: AuthGate(auth: auth, store: store),
     );
   }
