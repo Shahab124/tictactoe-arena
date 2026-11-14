@@ -119,7 +119,7 @@ class HomeScreen extends StatelessWidget {
                           const SizedBox(width: 16),
                           Expanded(child: _Reveal(order: 2, child: big)),
                         ])
-                      : Column(children: [
+                      : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                           _Reveal(order: 1, child: classic),
                           const SizedBox(height: 16),
                           _Reveal(order: 2, child: big),
