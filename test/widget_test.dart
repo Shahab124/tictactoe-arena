@@ -25,6 +25,13 @@ Future<Widget> app(FirebaseAuth auth) async {
   );
 }
 
+/// Scrolls a button into view before tapping, since the sign-in screen is
+/// taller than the test window.
+Future<void> tapText(WidgetTester tester, String text) async {
+  await tester.ensureVisible(find.text(text));
+  await tester.tap(find.text(text));
+}
+
 void main() {
   testWidgets('starts on the sign-in screen', (tester) async {
     await tester.pumpWidget(await app(MockFirebaseAuth()));
@@ -38,7 +45,7 @@ void main() {
     await tester.pumpWidget(await app(auth));
     await tester.pump();
     await enter(tester, 'ayesha@example.com', 'secret123');
-    await tester.tap(find.text('Create account'));
+    await tapText(tester, ('Create account'));
     await tester.pumpAndSettle();
     expect(auth.currentUser?.email, 'ayesha@example.com');
     expect(find.text('Playing as ayesha@example.com'), findsOneWidget);
@@ -49,11 +56,11 @@ void main() {
     await tester.pumpWidget(await app(auth));
     await tester.pump();
     await enter(tester, 'omar@example.com', 'secret123');
-    await tester.tap(find.text('Sign in'));
+    await tapText(tester, ('Sign in'));
     await tester.pumpAndSettle();
     expect(find.text('Playing as omar@example.com'), findsOneWidget);
 
-    await tester.tap(find.text('Sign out'));
+    await tapText(tester, ('Sign out'));
     await tester.pumpAndSettle();
     expect(find.text('Sign in'), findsOneWidget);
     expect(auth.currentUser, isNull);
@@ -75,7 +82,7 @@ void main() {
     await tester.pumpWidget(await app(auth));
     await tester.pump();
     await enter(tester, 'omar@example.com', 'nope');
-    await tester.tap(find.text('Sign in'));
+    await tapText(tester, ('Sign in'));
     await tester.pumpAndSettle();
     expect(find.text('Wrong email or password.'), findsOneWidget);
     expect(auth.currentUser, isNull);
@@ -85,7 +92,7 @@ void main() {
     final auth = MockFirebaseAuth();
     await tester.pumpWidget(await app(auth));
     await tester.pump();
-    await tester.tap(find.text('Play as guest'));
+    await tapText(tester, ('Play as guest'));
     await tester.pumpAndSettle();
     expect(find.text('Playing as Guest'), findsOneWidget);
     expect(auth.currentUser, isNull);
@@ -94,12 +101,12 @@ void main() {
   testWidgets('password reset needs an email, then confirms', (tester) async {
     await tester.pumpWidget(await app(MockFirebaseAuth()));
     await tester.pump();
-    await tester.tap(find.text('Forgot password?'));
+    await tapText(tester, ('Forgot password?'));
     await tester.pump();
     expect(find.text('Enter your email first.'), findsOneWidget);
 
     await enter(tester, 'zain@example.com', '');
-    await tester.tap(find.text('Forgot password?'));
+    await tapText(tester, ('Forgot password?'));
     await tester.pumpAndSettle();
     expect(find.text('Password reset email sent to zain@example.com.'),
         findsOneWidget);

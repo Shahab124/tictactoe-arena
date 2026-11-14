@@ -2,6 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../ui/mark.dart';
+
 /// Sign up, sign in, Google sign-in, password reset and guest play
 /// (REQ-ACC-01, 02 and 06). Passwords are handled only by Firebase
 /// Authentication and never stored by the app (REQ-DATA-07).
@@ -73,16 +75,32 @@ class _SignInScreenState extends State<SignInScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('TicTacToe Arena')),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
+            constraints: const BoxConstraints(maxWidth: 420),
             child: AutofillGroup(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const Center(child: ArenaLogo()),
+                  const SizedBox(height: 20),
+                  Text(
+                    'TicTacToe Arena',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context)
+                        .textTheme
+                        .headlineMedium
+                        ?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Classic 3×3 or the big 8×8 board.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 28),
                   TextField(
                     controller: _email,
                     decoration: const InputDecoration(labelText: 'Email'),
@@ -106,23 +124,28 @@ class _SignInScreenState extends State<SignInScreen> {
                     onPressed: _busy ? null : _signIn,
                     child: const Text('Sign in'),
                   ),
+                  const SizedBox(height: 10),
                   OutlinedButton(
                     onPressed: _busy ? null : _signUp,
                     child: const Text('Create account'),
                   ),
+                  if (_googleSupported) ...[
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : _google,
+                      icon: const Icon(Icons.g_mobiledata, size: 28),
+                      label: const Text('Continue with Google'),
+                    ),
+                  ],
                   TextButton(
                     onPressed: _busy ? null : _reset,
                     child: const Text('Forgot password?'),
                   ),
-                  if (_googleSupported)
-                    OutlinedButton(
-                      onPressed: _busy ? null : _google,
-                      child: const Text('Continue with Google'),
-                    ),
-                  const Divider(height: 32),
-                  TextButton(
+                  const Divider(height: 24),
+                  TextButton.icon(
                     onPressed: _busy ? null : widget.onGuest,
-                    child: const Text('Play as guest'),
+                    icon: const Icon(Icons.sports_esports_outlined),
+                    label: const Text('Play as guest'),
                   ),
                 ],
               ),

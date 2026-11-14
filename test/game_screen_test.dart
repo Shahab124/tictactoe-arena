@@ -24,7 +24,7 @@ Finder cell(int r, int c) => find.bySemanticsLabel(RegExp('^Row ${r + 1}, column
 Future<void> play(WidgetTester tester, List<(int, int)> moves) async {
   for (final (r, c) in moves) {
     await tester.tap(cell(r, c));
-    await tester.pump();
+    await tester.pumpAndSettle();
   }
 }
 
@@ -73,7 +73,7 @@ void main() {
     await open(tester);
     await play(tester, [(0, 0), (1, 0), (0, 1), (1, 1), (0, 2)]);
     await tester.tap(find.text('Rematch'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text("X's turn"), findsOneWidget);
     expect(find.bySemanticsLabel(RegExp(', [XO]\$')), findsNothing);
   });
