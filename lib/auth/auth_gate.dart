@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../data/game_store.dart';
 import '../data/history_screen.dart';
+import '../game/game_screen.dart';
 import 'sign_in_screen.dart';
 
 /// Shows the sign-in screen until the player signs in or chooses guest play.
@@ -44,24 +45,29 @@ class _AuthGateState extends State<AuthGate> {
           onHistory: () => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) =>
                   HistoryScreen(store: widget.store, uid: user?.uid))),
+          onPlay: (size) => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => GameScreen(
+                  size: size, store: widget.store, uid: user?.uid))),
         );
       },
     );
   }
 }
 
-/// Placeholder home until the game screen (SCRUM-14) is merged.
+/// Home menu. The full game setup screen comes in SCRUM-17.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({
     super.key,
     required this.name,
     required this.onSignOut,
     required this.onHistory,
+    required this.onPlay,
   });
 
   final String name;
   final VoidCallback onSignOut;
   final VoidCallback onHistory;
+  final void Function(int size) onPlay;
 
   @override
   Widget build(BuildContext context) {
@@ -79,6 +85,16 @@ class HomeScreen extends StatelessWidget {
             Text('Playing as $name'),
             const SizedBox(height: 16),
             FilledButton(
+              onPressed: () => onPlay(3),
+              child: const Text('Two players · 3×3'),
+            ),
+            const SizedBox(height: 8),
+            FilledButton(
+              onPressed: () => onPlay(8),
+              child: const Text('Two players · 8×8'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton(
               onPressed: onHistory,
               child: const Text('History & statistics'),
             ),
