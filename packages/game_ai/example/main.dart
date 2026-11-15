@@ -1,4 +1,5 @@
 // The example calls from the README. Run with: dart run example/main.dart
+// ignore_for_file: avoid_print
 import 'dart:convert';
 
 import 'package:game_ai/game_ai.dart';
