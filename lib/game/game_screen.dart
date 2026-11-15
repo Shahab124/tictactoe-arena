@@ -76,93 +76,119 @@ class _GameScreenState extends State<GameScreen> {
     final winning = _game.winningCells.toSet();
     final gap = widget.size == 3 ? 10.0 : 4.0;
     final turn = _game.isOver ? null : _game.sideToMove;
+    final header = Row(children: [
+      Expanded(child: _PlayerChip(mark: Mark.x, active: turn == Mark.x)),
+      const SizedBox(width: 12),
+      Expanded(child: _PlayerChip(mark: Mark.o, active: turn == Mark.o)),
+    ]);
+    final status = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: AnimatedSwitcher(
+        duration: motion(context, 250),
+        transitionBuilder: (child, a) => FadeTransition(
+          opacity: a,
+          child: ScaleTransition(
+              scale: Tween(begin: 0.85, end: 1.0).animate(a), child: child),
+        ),
+        child: Text(
+          _statusText,
+          key: ValueKey(_statusText),
+          style: Theme.of(context)
+              .textTheme
+              .headlineSmall
+              ?.copyWith(fontWeight: FontWeight.w800),
+        ),
+      ),
+    );
+    Widget grid = Card(
+      child: Padding(
+        padding: EdgeInsets.all(gap),
+        child: GridView.count(
+          crossAxisCount: widget.size,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: gap,
+          crossAxisSpacing: gap,
+          children: [
+            for (var r = 0; r < widget.size; r++)
+              for (var c = 0; c < widget.size; c++)
+                _Cell(
+                  mark: _game.at(r, c),
+                  row: r,
+                  col: c,
+                  highlighted: winning.contains((r, c)),
+                  radius: widget.size == 3 ? 14 : 6,
+                  colors: colors,
+                  onTap: () => _tap(r, c),
+                ),
+          ],
+        ),
+      ),
+    );
+    // The 8×8 cells are small on a phone, so the player can pinch to zoom
+    // and drag to move around the board (REQ-PLAT-11).
+    if (widget.size == 8) {
+      grid = InteractiveViewer(minScale: 1, maxScale: 4, child: grid);
+    }
+    final board = Center(child: AspectRatio(aspectRatio: 1, child: grid));
+    final hint = [
+      if (widget.size == 8)
+        const Padding(
+          padding: EdgeInsets.only(bottom: 8),
+          child: Text('Pinch to zoom, drag to move'),
+        ),
+    ];
+    final button = FilledButton.icon(
+      onPressed: () => setState(() => _game = Game(size: widget.size)),
+      icon: Icon(
+          _game.isOver ? Icons.replay_rounded : Icons.restart_alt_rounded),
+      label: Text(_game.isOver ? 'Rematch' : 'Restart'),
+    );
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.size == 3 ? 'Classic 3×3' : 'Big 8×8 · five in a row',
             style: const TextStyle(fontWeight: FontWeight.w800)),
       ),
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: Column(
-              children: [
+        child: LayoutBuilder(builder: (context, box) {
+          // Landscape phones and tablets: board on the left, controls on the
+          // right, so the board uses the full height (REQ-UX-02).
+          if (box.maxWidth > box.maxHeight) {
+            return Row(children: [
+              Expanded(
+                child: Padding(padding: const EdgeInsets.all(12), child: board),
+              ),
+              SizedBox(
+                width: 300,
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(children: [header, status, ...hint, button]),
+                  ),
+                ),
+              ),
+            ]);
+          }
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: Column(children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                  child: Row(children: [
-                    Expanded(child: _PlayerChip(mark: Mark.x, active: turn == Mark.x)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _PlayerChip(mark: Mark.o, active: turn == Mark.o)),
-                  ]),
+                  child: header,
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  child: AnimatedSwitcher(
-                    duration: motion(context, 250),
-                    transitionBuilder: (child, a) => FadeTransition(
-                      opacity: a,
-                      child: ScaleTransition(
-                          scale: Tween(begin: 0.85, end: 1.0).animate(a),
-                          child: child),
-                    ),
-                    child: Text(
-                      _statusText,
-                      key: ValueKey(_statusText),
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                ),
+                status,
+                ...hint,
                 Expanded(
-                  child: Center(
-                    child: AspectRatio(
-                      aspectRatio: 1,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Card(
-                          child: Padding(
-                            padding: EdgeInsets.all(gap),
-                            child: GridView.count(
-                              crossAxisCount: widget.size,
-                              physics: const NeverScrollableScrollPhysics(),
-                              mainAxisSpacing: gap,
-                              crossAxisSpacing: gap,
-                              children: [
-                                for (var r = 0; r < widget.size; r++)
-                                  for (var c = 0; c < widget.size; c++)
-                                    _Cell(
-                                      mark: _game.at(r, c),
-                                      row: r,
-                                      col: c,
-                                      highlighted: winning.contains((r, c)),
-                                      radius: widget.size == 3 ? 14 : 6,
-                                      colors: colors,
-                                      onTap: () => _tap(r, c),
-                                    ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: board,
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: FilledButton.icon(
-                    onPressed: () => setState(() => _game = Game(size: widget.size)),
-                    icon: Icon(_game.isOver
-                        ? Icons.replay_rounded
-                        : Icons.restart_alt_rounded),
-                    label: Text(_game.isOver ? 'Rematch' : 'Restart'),
-                  ),
-                ),
-              ],
+                Padding(padding: const EdgeInsets.all(16), child: button),
+              ]),
             ),
-          ),
-        ),
+          );
+        }),
       ),
     );
   }
