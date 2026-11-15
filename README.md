@@ -15,13 +15,19 @@ Built by Team Alpha for Software Engineering, Fall 2026 (PUCIT).
 
 ## Build and run
 
-Install [Flutter](https://docs.flutter.dev/get-started/install), then from the repo root:
+You need [Git](https://git-scm.com/downloads) and [Flutter](https://docs.flutter.dev/get-started/install) 3.47.9 (the version our CI uses; it includes Dart). Run `flutter doctor` to check the install.
 
 ```bash
+git clone https://github.com/Shahab124/tictactoe-arena.git
+cd tictactoe-arena
 flutter create --platforms=android,ios,web,windows --project-name tictactoe_arena .
 flutter pub get
 flutter run -d chrome
 ```
+
+- `flutter create` only adds the platform folders (`android/`, `web/`, ...), which are not stored in the repo. It does not change our code.
+- To run on an Android phone, turn on USB debugging, plug it in and use `flutter run` instead of `flutter run -d chrome`. To build an installable APK: `flutter build apk --release`.
+- No Firebase setup is needed. The app connects to our Firebase project through `lib/firebase_options.dart`. You can sign up with an email, or choose **Play as guest** to play without an account.
 
 Run the tests:
 
@@ -32,6 +38,123 @@ cd packages/game_ai && dart pub get && dart test && cd ../..
 ```
 
 GitHub runs these tests automatically on every pull request.
+
+## Game AI interface
+
+The Game AI is the Dart package `packages/game_ai`. It has no database, network or Flutter code, so any Dart or Flutter platform can use it. It has one function:
+
+```dart
+Map<String, Object> requestMove(Map<String, dynamic> request)
+```
+
+You give it the board and it returns one legal move. It never throws and never changes your board.
+
+### Use it in your project
+
+Copy the `packages/game_ai` folder into your project and add it to your `pubspec.yaml`:
+
+```yaml
+dependencies:
+  game_ai:
+    path: packages/game_ai
+```
+
+```dart
+import 'package:game_ai/game_ai.dart';
+
+final reply = requestMove({
+  'board': [
+    ['X', 'X', ''],
+    ['', 'O', ''],
+    ['', '', ''],
+  ],
+  'winLength': 3,
+  'sideToMove': 'O',
+  'difficulty': 'hard',
+});
+if (reply.containsKey('error')) {
+  print('${reply['error']}: ${reply['message']}');
+} else {
+  print('AI plays row ${reply['row']}, column ${reply['col']}'); // row 0, column 2
+}
+```
+
+### Request
+
+| Field | Type | Allowed values |
+| --- | --- | --- |
+| `board` | list of rows | 3 rows of 3 cells, or 8 rows of 8 cells. Each cell is `"X"`, `"O"` or `""` (empty). |
+| `winLength` | number | `3` on a 3×3 board; `4` or `5` on an 8×8 board. |
+| `sideToMove` | text | `"X"` or `"O"`: the mark the AI plays. |
+| `difficulty` | text | `"easy"`, `"medium"`, `"hard"` or `"expert"`. Optional; `"medium"` if left out. |
+
+**Board format:** `board[row][col]`, counted from 0. Row 0 is the top row and column 0 is the left column. The number of X and O marks may differ by at most one.
+
+```json
+{
+  "board": [["X", "X", ""], ["", "O", ""], ["", "", ""]],
+  "winLength": 3,
+  "sideToMove": "O",
+  "difficulty": "hard"
+}
+```
+
+### Response
+
+A move, using the same row and column numbering as the board:
+
+```json
+{"row": 0, "col": 2}
+```
+
+or an error:
+
+```json
+{"error": "INVALID_SIDE", "message": "sideToMove must be \"X\" or \"O\"."}
+```
+
+### Error codes
+
+| Code | When |
+| --- | --- |
+| `INVALID_BOARD` | The board is not a list of 3 or 8 rows, a row has the wrong length, or the X and O counts differ by more than one. |
+| `INVALID_CELL` | A cell is not `"X"`, `"O"` or `""`. |
+| `INVALID_WIN_LENGTH` | `winLength` is not allowed for this board size. |
+| `INVALID_SIDE` | `sideToMove` is not `"X"` or `"O"`. |
+| `INVALID_DIFFICULTY` | `difficulty` is not one of the four levels. |
+| `GAME_OVER` | Someone has already won, or the board is full. |
+
+`message` is a short English sentence that explains the problem. Check `error`, not `message`, in your code.
+
+### Difficulty levels
+
+- `easy`: a random empty cell.
+- `medium`: wins if it can, blocks your win, otherwise random.
+- `hard`: never loses on 3×3. On 8×8 it plays like `medium`.
+- `expert`: the strongest level on 8×8, and answers well inside 2 seconds. On 3×3 it plays like `hard`.
+
+### Try the example calls
+
+`packages/game_ai/example/main.dart` makes two normal calls and one call for every error code:
+
+```bash
+cd packages/game_ai
+dart pub get
+dart run example/main.dart
+```
+
+It prints:
+
+```text
+{"row":0,"col":2}
+{"row":3,"col":3}
+{"error":"INVALID_BOARD","message":"The board must have 3 or 8 rows."}
+{"error":"INVALID_CELL","message":"Cell (0, 1) must be \"X\", \"O\" or \"\", not \"Z\"."}
+{"error":"INVALID_WIN_LENGTH","message":"Win length must be one of [4, 5] on a 8×8 board."}
+{"error":"INVALID_SIDE","message":"sideToMove must be \"X\" or \"O\"."}
+{"error":"INVALID_DIFFICULTY","message":"difficulty must be one of easy, medium, hard, expert."}
+{"error":"GAME_OVER","message":"The game is already won or the board is full."}
+```
 
 ## Download the app
 
