@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../data/game_store.dart';
 import '../data/history_screen.dart';
-import '../game/game_screen.dart';
+import '../game/setup_screen.dart';
 import '../ui/theme.dart';
 import 'sign_in_screen.dart';
 
@@ -47,15 +47,15 @@ class _AuthGateState extends State<AuthGate> {
               builder: (_) =>
                   HistoryScreen(store: widget.store, uid: user?.uid))),
           onPlay: (size) => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => GameScreen(
-                  size: size, store: widget.store, uid: user?.uid))),
+              builder: (_) => SetupScreen(
+                  initialSize: size, store: widget.store, uid: user?.uid))),
         );
       },
     );
   }
 }
 
-/// Home menu. The full game setup screen comes in SCRUM-17.
+/// Home menu. Each board card opens the game setup screen.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({
     super.key,
@@ -75,7 +75,7 @@ class HomeScreen extends StatelessWidget {
     final text = Theme.of(context).textTheme;
     final classic = _ModeCard(
       title: 'Classic 3×3',
-      subtitle: 'Three in a row. Two players, one device.',
+      subtitle: 'Three in a row on the small board.',
       icon: Icons.grid_3x3_rounded,
       colors: const [ArenaColors.x, Color(0xFF5C8DFF)],
       onTap: () => onPlay(3),
