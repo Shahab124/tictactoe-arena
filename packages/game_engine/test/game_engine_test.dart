@@ -158,4 +158,22 @@ void main() {
       ['', '', ''],
     ]);
   });
+
+  test('undo takes back the last move and gives the turn back', () {
+    final g = playAll(Game(), [(0, 0), (1, 1)]);
+    expect(g.undo(), isTrue);
+    expect(g.at(1, 1), isNull);
+    expect(g.sideToMove, Mark.o);
+    expect(g.moves, [(0, 0)]);
+    expect(g.play(1, 1), MoveResult.ok);
+    expect(g.at(1, 1), Mark.o);
+  });
+
+  test('undo does nothing on an empty board or after the game is over', () {
+    expect(Game().undo(), isFalse);
+    final g = playAll(Game(), [(0, 0), (1, 0), (0, 1), (1, 1), (0, 2)]);
+    expect(g.status, GameStatus.xWon);
+    expect(g.undo(), isFalse);
+    expect(g.at(0, 2), Mark.x);
+  });
 }
