@@ -36,6 +36,7 @@ void main() {
     await tester.pump();
     expect(find.text('Five in a row wins. Pinch the board to zoom.'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Start game'));
     await tester.tap(find.text('Start game'));
     await tester.pumpAndSettle();
     expect(cells, findsNWidgets(64));
