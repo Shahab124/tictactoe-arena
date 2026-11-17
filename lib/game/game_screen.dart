@@ -5,19 +5,29 @@ import '../data/game_record.dart';
 import '../data/game_store.dart';
 import '../ui/mark.dart';
 import '../ui/theme.dart';
+import 'ai_client.dart';
 
-/// Local two-player game on one device (REQ-MODE-02): the board, whose turn
-/// it is, the winning line and one-tap rematch (REQ-PLAT-05, 07, 08, 13).
+/// A game on one device: two local players (REQ-MODE-02), or the player as X
+/// against the computer as O when [difficulty] is set (REQ-MODE-01). Shows
+/// the board, whose turn it is, the winning line and one-tap rematch
+/// (REQ-PLAT-05, 07, 08, 13).
 class GameScreen extends StatefulWidget {
   const GameScreen({
     super.key,
     required this.size,
     required this.store,
     this.uid,
+    this.difficulty,
+    this.ai = localAi,
   });
 
   final int size;
   final GameStore store;
+
+  /// 'easy', 'medium', 'hard' or 'expert' to play the computer; null for two
+  /// local players.
+  final String? difficulty;
+  final AiClient ai;
 
   /// Null for a guest.
   final String? uid;
@@ -28,8 +38,13 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> {
   late Game _game = Game(size: widget.size);
+  bool _thinking = false;
+  bool _aiFailed = false;
+
+  bool get _vsComputer => widget.difficulty != null;
 
   void _tap(int row, int col) {
+    if (_thinking || _aiFailed) return; // it is the computer's turn
     final result = _game.play(row, col);
     if (result == MoveResult.occupied) {
       ScaffoldMessenger.of(context)
@@ -40,17 +55,66 @@ class _GameScreenState extends State<GameScreen> {
     }
     if (result != MoveResult.ok) return; // game over: ignore (D3 REQ-PLAT 6.1)
     setState(() {});
-    if (_game.isOver) _save();
+    if (_game.isOver) {
+      _save();
+    } else if (_vsComputer) {
+      _computerTurn();
+    }
   }
 
-  // The signed-in player is X in a local game, so results are from X's side.
+  // REQ-INT-02.1: ask the AI for one move and play it only if the Game
+  // Engine accepts it. An error, an illegal move or no answer in time leaves
+  // the board unchanged and offers Retry or End game.
+  Future<void> _computerTurn() async {
+    final game = _game;
+    setState(() {
+      _thinking = true;
+      _aiFailed = false;
+    });
+    Map<String, Object>? reply;
+    try {
+      // A short pause so the player sees the computer take its turn.
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      reply = await widget.ai({
+        'board': game.toBoard(),
+        'winLength': game.winLength,
+        'sideToMove': Mark.o.symbol,
+        'difficulty': widget.difficulty,
+      }).timeout(Duration(seconds: game.size == 3 ? 1 : 2)); // D3 5.1
+    } catch (_) {
+      reply = null; // too slow or crashed: handled like an AI error
+    }
+    if (!mounted || game != _game) return; // left or restarted meanwhile
+    final row = reply?['row'], col = reply?['col'];
+    final played = row is int &&
+        col is int &&
+        game.play(row, col, mark: Mark.o) == MoveResult.ok;
+    setState(() {
+      _thinking = false;
+      _aiFailed = !played;
+    });
+    if (game.isOver) _save();
+  }
+
+  void _restart() => setState(() {
+        _game = Game(size: widget.size);
+        _thinking = false;
+        _aiFailed = false;
+      });
+
+  String get _opponent {
+    final d = widget.difficulty!;
+    return 'Computer (${d[0].toUpperCase()}${d.substring(1)})';
+  }
+
+  // The player is X in local and computer games, so results are from X's side.
   void _save() {
     widget.store.save(
       GameRecord(
         boardSize: _game.size,
         winLength: _game.winLength,
-        mode: 'local',
-        opponent: 'Local player',
+        mode: _vsComputer ? 'computer' : 'local',
+        opponent: _vsComputer ? _opponent : 'Local player',
         moves: _game.moves,
         result: switch (_game.status) {
           GameStatus.xWon => 'win',
@@ -63,12 +127,17 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  String get _statusText => switch (_game.status) {
-        GameStatus.inProgress => "${_game.sideToMove.symbol}'s turn",
-        GameStatus.xWon => 'X wins!',
-        GameStatus.oWon => 'O wins!',
-        GameStatus.draw => "It's a draw",
-      };
+  String get _statusText {
+    if (_aiFailed) return 'The computer could not make a move';
+    if (_thinking) return 'Computer is thinking…';
+    return switch (_game.status) {
+      GameStatus.inProgress =>
+        _vsComputer ? 'Your turn' : "${_game.sideToMove.symbol}'s turn",
+      GameStatus.xWon => _vsComputer ? 'You win!' : 'X wins!',
+      GameStatus.oWon => _vsComputer ? 'Computer wins!' : 'O wins!',
+      GameStatus.draw => "It's a draw",
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -77,9 +146,17 @@ class _GameScreenState extends State<GameScreen> {
     final gap = widget.size == 3 ? 10.0 : 4.0;
     final turn = _game.isOver ? null : _game.sideToMove;
     final header = Row(children: [
-      Expanded(child: _PlayerChip(mark: Mark.x, active: turn == Mark.x)),
+      Expanded(
+          child: _PlayerChip(
+              mark: Mark.x,
+              label: _vsComputer ? 'You' : 'Player X',
+              active: turn == Mark.x)),
       const SizedBox(width: 12),
-      Expanded(child: _PlayerChip(mark: Mark.o, active: turn == Mark.o)),
+      Expanded(
+          child: _PlayerChip(
+              mark: Mark.o,
+              label: _vsComputer ? 'Computer' : 'Player O',
+              active: turn == Mark.o)),
     ]);
     final status = Padding(
       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -93,6 +170,7 @@ class _GameScreenState extends State<GameScreen> {
         child: Text(
           _statusText,
           key: ValueKey(_statusText),
+          textAlign: TextAlign.center,
           style: Theme.of(context)
               .textTheme
               .headlineSmall
@@ -137,12 +215,26 @@ class _GameScreenState extends State<GameScreen> {
           child: Text('Pinch to zoom, drag to move'),
         ),
     ];
-    final button = FilledButton.icon(
-      onPressed: () => setState(() => _game = Game(size: widget.size)),
-      icon: Icon(
-          _game.isOver ? Icons.replay_rounded : Icons.restart_alt_rounded),
-      label: Text(_game.isOver ? 'Rematch' : 'Restart'),
-    );
+    final button = _aiFailed
+        ? Row(children: [
+            Expanded(
+              child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('End game')),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton(
+                  onPressed: _computerTurn, child: const Text('Retry')),
+            ),
+          ])
+        : FilledButton.icon(
+            onPressed: _restart,
+            icon: Icon(_game.isOver
+                ? Icons.replay_rounded
+                : Icons.restart_alt_rounded),
+            label: Text(_game.isOver ? 'Rematch' : 'Restart'),
+          );
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.size == 3 ? 'Classic 3×3' : 'Big 8×8 · five in a row',
@@ -248,9 +340,11 @@ class _Cell extends StatelessWidget {
 
 /// Shows a player's mark; lights up when it is their turn.
 class _PlayerChip extends StatelessWidget {
-  const _PlayerChip({required this.mark, required this.active});
+  const _PlayerChip(
+      {required this.mark, required this.label, required this.active});
 
   final Mark mark;
+  final String label;
   final bool active;
 
   @override
@@ -273,7 +367,7 @@ class _PlayerChip extends StatelessWidget {
           SizedBox.square(dimension: 28, child: MarkView(mark: mark)),
           const SizedBox(width: 10),
           Flexible(
-            child: Text('Player ${mark.symbol}',
+            child: Text(label,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                     fontWeight: active ? FontWeight.w800 : FontWeight.w500)),

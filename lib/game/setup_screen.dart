@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/game_store.dart';
+import 'ai_client.dart';
 import 'game_screen.dart';
 
 /// Game setup: the player picks the board size and the mode, then starts
@@ -26,6 +27,7 @@ class SetupScreen extends StatefulWidget {
 class _SetupScreenState extends State<SetupScreen> {
   late int _size = widget.initialSize;
   String _mode = 'local';
+  String _difficulty = 'medium';
 
   @override
   Widget build(BuildContext context) {
@@ -75,19 +77,31 @@ class _SetupScreenState extends State<SetupScreen> {
                           value: 'local',
                           icon: Icon(Icons.people_alt_rounded),
                           label: Text('Two players')),
-                      // Play against the computer is added in SCRUM-18.
                       ButtonSegment(
                           value: 'computer',
                           icon: Icon(Icons.smart_toy_rounded),
-                          label: Text('Computer'),
-                          enabled: false),
+                          label: Text('Computer')),
                     ],
                     selected: {_mode},
                     onSelectionChanged: (s) => setState(() => _mode = s.single),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                      'Two players take turns on this device. Play against the computer is coming soon.'),
+                  Text(_mode == 'local'
+                      ? 'Two players take turns on this device.'
+                      : 'You play X and move first. Works without internet.'),
+                  if (_mode == 'computer') ...[
+                    const SizedBox(height: 24),
+                    Text('Difficulty', style: label),
+                    const SizedBox(height: 8),
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      for (final d in difficulties)
+                        ChoiceChip(
+                          label: Text('${d[0].toUpperCase()}${d.substring(1)}'),
+                          selected: _difficulty == d,
+                          onSelected: (_) => setState(() => _difficulty = d),
+                        ),
+                    ]),
+                  ],
                   const SizedBox(height: 32),
                   FilledButton.icon(
                     onPressed: () => Navigator.of(context).push(
@@ -95,7 +109,10 @@ class _SetupScreenState extends State<SetupScreen> {
                             builder: (_) => GameScreen(
                                 size: _size,
                                 store: widget.store,
-                                uid: widget.uid))),
+                                uid: widget.uid,
+                                difficulty: _mode == 'computer'
+                                    ? _difficulty
+                                    : null))),
                     icon: const Icon(Icons.play_arrow_rounded),
                     label: const Text('Start game'),
                   ),
