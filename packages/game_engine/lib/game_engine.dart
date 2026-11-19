@@ -98,6 +98,16 @@ class Game {
     return MoveResult.ok;
   }
 
+  /// Takes back the last move (REQ-PLAT-14). Returns false if there is
+  /// nothing to undo or the game is over.
+  bool undo() {
+    if (_moves.isEmpty || isOver) return false;
+    final (row, col) = _moves.removeLast();
+    _cells[row][col] = null;
+    _sideToMove = _sideToMove.other;
+    return true;
+  }
+
   /// The board as rows of 'X', 'O' or '' (the AI request format, D3 2.4).
   List<List<String>> toBoard() => [
         for (final row in _cells) [for (final m in row) m?.symbol ?? '']
