@@ -6,7 +6,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 
 const env = await initializeTestEnvironment({
   projectId: 'demo-tictactoe-arena',
@@ -39,4 +39,20 @@ test('signed-out users can read and write nothing', async () => {
 
 test('collections outside users/ are closed', async () => {
   await assertFails(setDoc(doc(db('ayesha'), 'leaderboard/top'), { score: 1 }));
+});
+
+test('a player can claim a free username and release it', async () => {
+  await assertSucceeds(setDoc(doc(db('ayesha'), 'usernames/ayesha_k'), { uid: 'ayesha' }));
+  await assertSucceeds(getDoc(doc(db('omar'), 'usernames/ayesha_k')));
+  await assertSucceeds(deleteDoc(doc(db('ayesha'), 'usernames/ayesha_k')));
+});
+
+test("usernames are unique and can't be taken or claimed for someone else", async () => {
+  await env.withSecurityRulesDisabled((ctx) =>
+    setDoc(doc(ctx.firestore(), 'usernames/omar'), { uid: 'omar' }));
+  await assertFails(setDoc(doc(db('ayesha'), 'usernames/omar'), { uid: 'ayesha' }));
+  await assertFails(deleteDoc(doc(db('ayesha'), 'usernames/omar')));
+  await assertFails(setDoc(doc(db('ayesha'), 'usernames/zara'), { uid: 'zara' }));
+  await assertFails(setDoc(doc(db('ayesha'), 'usernames/Bad Name!'), { uid: 'ayesha' }));
+  await assertFails(getDoc(doc(db(null), 'usernames/omar')));
 });
