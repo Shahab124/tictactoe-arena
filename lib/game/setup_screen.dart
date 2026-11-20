@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:game_engine/game_engine.dart';
 
 import '../data/game_store.dart';
 import 'ai_client.dart';
 import 'game_screen.dart';
 
-/// Game setup: the player picks the board size and the mode, then starts
-/// (REQ-PLAT-01).
+/// Game setup: the player picks the board size, win length on 8×8, the mode,
+/// X or O and who starts, and a single game or a best-of-3/5 match
+/// (REQ-PLAT-01, 04, 15, REQ-MODE-06).
 class SetupScreen extends StatefulWidget {
   const SetupScreen({
     super.key,
@@ -28,6 +30,28 @@ class _SetupScreenState extends State<SetupScreen> {
   late int _size = widget.initialSize;
   String _mode = 'local';
   String _difficulty = 'medium';
+  int _winLength = 5;
+  Mark _playerMark = Mark.x;
+  bool _youStart = true;
+  int _bestOf = 1;
+
+  bool get _vsComputer => _mode == 'computer';
+
+  // Against the computer "who starts" is you or the computer; in a local
+  // game it is X or O.
+  Mark get _firstToMove => _vsComputer
+      ? (_youStart ? _playerMark : _playerMark.other)
+      : (_youStart ? Mark.x : Mark.o);
+
+  Widget _choice<T>(List<(T, String)> options, T value, ValueChanged<T> set) =>
+      SegmentedButton<T>(
+        segments: [
+          for (final (v, text) in options)
+            ButtonSegment(value: v, label: Text(text)),
+        ],
+        selected: {value},
+        onSelectionChanged: (s) => setState(() => set(s.single)),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -65,9 +89,14 @@ class _SetupScreenState extends State<SetupScreen> {
                     onSelectionChanged: (s) => setState(() => _size = s.single),
                   ),
                   const SizedBox(height: 8),
+                  if (_size == 8) ...[
+                    _choice([(4, '4 in a row'), (5, '5 in a row')], _winLength,
+                        (v) => _winLength = v),
+                    const SizedBox(height: 8),
+                  ],
                   Text(_size == 3
                       ? 'Three in a row wins.'
-                      : 'Five in a row wins. Pinch the board to zoom.'),
+                      : '${_winLength == 4 ? 'Four' : 'Five'} in a row wins. Pinch the board to zoom.'),
                   const SizedBox(height: 24),
                   Text('Mode', style: label),
                   const SizedBox(height: 8),
@@ -88,7 +117,7 @@ class _SetupScreenState extends State<SetupScreen> {
                   const SizedBox(height: 8),
                   Text(_mode == 'local'
                       ? 'Two players take turns on this device.'
-                      : 'You play X and move first. Works without internet.'),
+                      : 'Works without internet.'),
                   if (_mode == 'computer') ...[
                     const SizedBox(height: 24),
                     Text('Difficulty', style: label),
@@ -101,7 +130,26 @@ class _SetupScreenState extends State<SetupScreen> {
                           onSelected: (_) => setState(() => _difficulty = d),
                         ),
                     ]),
+                    const SizedBox(height: 24),
+                    Text('You play', style: label),
+                    const SizedBox(height: 8),
+                    _choice([(Mark.x, 'X'), (Mark.o, 'O')], _playerMark,
+                        (v) => _playerMark = v),
                   ],
+                  const SizedBox(height: 24),
+                  Text('Who starts', style: label),
+                  const SizedBox(height: 8),
+                  _choice(
+                      _vsComputer
+                          ? [(true, 'You'), (false, 'Computer')]
+                          : [(true, 'X'), (false, 'O')],
+                      _youStart,
+                      (v) => _youStart = v),
+                  const SizedBox(height: 24),
+                  Text('Match', style: label),
+                  const SizedBox(height: 8),
+                  _choice([(1, 'Single'), (3, 'Best of 3'), (5, 'Best of 5')],
+                      _bestOf, (v) => _bestOf = v),
                   const SizedBox(height: 32),
                   FilledButton.icon(
                     onPressed: () => Navigator.of(context).push(
@@ -110,9 +158,11 @@ class _SetupScreenState extends State<SetupScreen> {
                                 size: _size,
                                 store: widget.store,
                                 uid: widget.uid,
-                                difficulty: _mode == 'computer'
-                                    ? _difficulty
-                                    : null))),
+                                difficulty: _vsComputer ? _difficulty : null,
+                                winLength: _size == 8 ? _winLength : null,
+                                playerMark: _playerMark,
+                                firstToMove: _firstToMove,
+                                bestOf: _bestOf))),
                     icon: const Icon(Icons.play_arrow_rounded),
                     label: const Text('Start game'),
                   ),

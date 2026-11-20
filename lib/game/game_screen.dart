@@ -10,7 +10,9 @@ import 'ai_client.dart';
 /// A game on one device: two local players (REQ-MODE-02), or the player as X
 /// against the computer as O when [difficulty] is set (REQ-MODE-01). Shows
 /// the board, whose turn it is, the winning line and one-tap rematch
-/// (REQ-PLAT-05, 07, 08, 13).
+/// (REQ-PLAT-05, 07, 08, 13). Also covers 4 or 5 in a row on 8×8, the
+/// last-move marker, undo against the computer, X/O and who starts, and
+/// best-of-3/5 matches (REQ-PLAT-04, 12, 14, 15, REQ-MODE-06).
 class GameScreen extends StatefulWidget {
   const GameScreen({
     super.key,
@@ -19,9 +21,23 @@ class GameScreen extends StatefulWidget {
     this.uid,
     this.difficulty,
     this.ai = localAi,
+    this.winLength,
+    this.playerMark = Mark.x,
+    this.firstToMove = Mark.x,
+    this.bestOf = 1,
   });
 
   final int size;
+
+  /// 4 or 5 on 8×8; null for the default.
+  final int? winLength;
+
+  /// The player's mark against the computer.
+  final Mark playerMark;
+  final Mark firstToMove;
+
+  /// 1 for a single game, or 3 or 5 for a match.
+  final int bestOf;
   final GameStore store;
 
   /// 'easy', 'medium', 'hard' or 'expert' to play the computer; null for two
@@ -37,14 +53,33 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> {
-  late Game _game = Game(size: widget.size);
+  late Game _game = _newGame();
   bool _thinking = false;
   bool _aiFailed = false;
+  final _wins = {Mark.x: 0, Mark.o: 0};
 
   bool get _vsComputer => widget.difficulty != null;
+  Mark get _aiMark => widget.playerMark.other;
+
+  Game _newGame() => Game(
+      size: widget.size,
+      winLength: widget.winLength,
+      firstToMove: widget.firstToMove);
+
+  bool get _matchOver =>
+      widget.bestOf > 1 && _wins.values.any((w) => w > widget.bestOf ~/ 2);
+
+  @override
+  void initState() {
+    super.initState();
+    if (_vsComputer && widget.firstToMove == _aiMark) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _computerTurn());
+    }
+  }
 
   void _tap(int row, int col) {
     if (_thinking || _aiFailed) return; // it is the computer's turn
+    if (_vsComputer && _game.sideToMove == _aiMark) return;
     final result = _game.play(row, col);
     if (result == MoveResult.occupied) {
       ScaffoldMessenger.of(context)
@@ -56,7 +91,7 @@ class _GameScreenState extends State<GameScreen> {
     if (result != MoveResult.ok) return; // game over: ignore (D3 REQ-PLAT 6.1)
     setState(() {});
     if (_game.isOver) {
-      _save();
+      _finish();
     } else if (_vsComputer) {
       _computerTurn();
     }
@@ -78,7 +113,7 @@ class _GameScreenState extends State<GameScreen> {
       reply = await widget.ai({
         'board': game.toBoard(),
         'winLength': game.winLength,
-        'sideToMove': Mark.o.symbol,
+        'sideToMove': _aiMark.symbol,
         'difficulty': widget.difficulty,
       }).timeout(Duration(seconds: game.size == 3 ? 1 : 2)); // D3 5.1
     } catch (_) {
@@ -88,17 +123,46 @@ class _GameScreenState extends State<GameScreen> {
     final row = reply?['row'], col = reply?['col'];
     final played = row is int &&
         col is int &&
-        game.play(row, col, mark: Mark.o) == MoveResult.ok;
+        game.play(row, col, mark: _aiMark) == MoveResult.ok;
     setState(() {
       _thinking = false;
       _aiFailed = !played;
     });
-    if (game.isOver) _save();
+    if (game.isOver) _finish();
   }
 
-  void _restart() => setState(() {
-        _game = Game(size: widget.size);
-        _thinking = false;
+  void _finish() {
+    _save();
+    final winner = switch (_game.status) {
+      GameStatus.xWon => Mark.x,
+      GameStatus.oWon => Mark.o,
+      _ => null,
+    };
+    if (winner != null) setState(() => _wins[winner] = _wins[winner]! + 1);
+  }
+
+  // Rematch, Restart, Next game or New match.
+  void _restart() {
+    setState(() {
+      if (_matchOver) _wins.updateAll((_, __) => 0);
+      _game = _newGame();
+      _thinking = false;
+      _aiFailed = false;
+    });
+    if (_vsComputer && widget.firstToMove == _aiMark) _computerTurn();
+  }
+
+  // Undo against the computer takes back the player's last move and the
+  // computer's reply to it (REQ-PLAT-14).
+  bool get _canUndo =>
+      _vsComputer &&
+      !_thinking &&
+      !_game.isOver &&
+      _game.moves.length > (widget.firstToMove == _aiMark ? 1 : 0);
+
+  void _undo() => setState(() {
+        if (_game.sideToMove == widget.playerMark) _game.undo();
+        _game.undo();
         _aiFailed = false;
       });
 
@@ -107,8 +171,10 @@ class _GameScreenState extends State<GameScreen> {
     return 'Computer (${d[0].toUpperCase()}${d.substring(1)})';
   }
 
-  // The player is X in local and computer games, so results are from X's side.
+  // Against the computer results are from the player's side; in a local
+  // game the signed-in player is X.
   void _save() {
+    final me = _vsComputer ? widget.playerMark : Mark.x;
     widget.store.save(
       GameRecord(
         boardSize: _game.size,
@@ -117,9 +183,9 @@ class _GameScreenState extends State<GameScreen> {
         opponent: _vsComputer ? _opponent : 'Local player',
         moves: _game.moves,
         result: switch (_game.status) {
-          GameStatus.xWon => 'win',
-          GameStatus.oWon => 'loss',
-          _ => 'draw',
+          GameStatus.draw => 'draw',
+          GameStatus.xWon => me == Mark.x ? 'win' : 'loss',
+          _ => me == Mark.o ? 'win' : 'loss',
         },
         playedAt: DateTime.now(),
       ),
@@ -127,35 +193,53 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
+  String _name(Mark m) => !_vsComputer
+      ? m.symbol
+      : m == widget.playerMark
+          ? 'You'
+          : 'Computer';
+
   String get _statusText {
     if (_aiFailed) return 'The computer could not make a move';
     if (_thinking) return 'Computer is thinking…';
-    return switch (_game.status) {
-      GameStatus.inProgress =>
-        _vsComputer ? 'Your turn' : "${_game.sideToMove.symbol}'s turn",
-      GameStatus.xWon => _vsComputer ? 'You win!' : 'X wins!',
-      GameStatus.oWon => _vsComputer ? 'Computer wins!' : 'O wins!',
-      GameStatus.draw => "It's a draw",
+    final winner = switch (_game.status) {
+      GameStatus.inProgress => null,
+      GameStatus.draw => null,
+      GameStatus.xWon => Mark.x,
+      GameStatus.oWon => Mark.o,
     };
+    if (!_game.isOver) {
+      return _vsComputer ? 'Your turn' : "${_game.sideToMove.symbol}'s turn";
+    }
+    if (winner == null) return "It's a draw";
+    final name = _name(winner);
+    final verb = name == 'You' ? 'win' : 'wins';
+    return _matchOver ? '$name $verb the match!' : '$name $verb!';
   }
+
+  /// The running score of a best-of-3 or best-of-5 match (REQ-MODE-06).
+  String get _scoreText =>
+      'Best of ${widget.bestOf} · ${_name(Mark.x)} ${_wins[Mark.x]} – '
+      '${_wins[Mark.o]} ${_name(Mark.o)}';
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final winning = _game.winningCells.toSet();
+    final last = _game.moves.isEmpty ? null : _game.moves.last;
     final gap = widget.size == 3 ? 10.0 : 4.0;
     final turn = _game.isOver ? null : _game.sideToMove;
     final header = Row(children: [
       Expanded(
           child: _PlayerChip(
               mark: Mark.x,
-              label: _vsComputer ? 'You' : 'Player X',
+              label: _vsComputer ? _name(Mark.x) : 'Player X',
               active: turn == Mark.x)),
       const SizedBox(width: 12),
       Expanded(
           child: _PlayerChip(
               mark: Mark.o,
-              label: _vsComputer ? 'Computer' : 'Player O',
+              label: _vsComputer ? _name(Mark.o) : 'Player O',
               active: turn == Mark.o)),
     ]);
     final status = Padding(
@@ -194,6 +278,7 @@ class _GameScreenState extends State<GameScreen> {
                   row: r,
                   col: c,
                   highlighted: winning.contains((r, c)),
+                  lastMove: last == (r, c),
                   radius: widget.size == 3 ? 14 : 6,
                   colors: colors,
                   onTap: () => _tap(r, c),
@@ -209,6 +294,12 @@ class _GameScreenState extends State<GameScreen> {
     }
     final board = Center(child: AspectRatio(aspectRatio: 1, child: grid));
     final hint = [
+      if (widget.bestOf > 1)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(_scoreText,
+              style: const TextStyle(fontWeight: FontWeight.w700)),
+        ),
       if (widget.size == 8)
         const Padding(
           padding: EdgeInsets.only(bottom: 8),
@@ -228,16 +319,37 @@ class _GameScreenState extends State<GameScreen> {
                   onPressed: _computerTurn, child: const Text('Retry')),
             ),
           ])
-        : FilledButton.icon(
-            onPressed: _restart,
-            icon: Icon(_game.isOver
-                ? Icons.replay_rounded
-                : Icons.restart_alt_rounded),
-            label: Text(_game.isOver ? 'Rematch' : 'Restart'),
-          );
+        : Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+                if (_vsComputer)
+                  OutlinedButton.icon(
+                    onPressed: _canUndo ? _undo : null,
+                    icon: const Icon(Icons.undo_rounded),
+                    label: const Text('Undo'),
+                  ),
+                FilledButton.icon(
+                  onPressed: _restart,
+                  icon: Icon(_game.isOver
+                      ? Icons.replay_rounded
+                      : Icons.restart_alt_rounded),
+                  label: Text(!_game.isOver
+                      ? 'Restart'
+                      : widget.bestOf == 1
+                          ? 'Rematch'
+                          : _matchOver
+                              ? 'New match'
+                              : 'Next game'),
+                ),
+              ]);
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.size == 3 ? 'Classic 3×3' : 'Big 8×8 · five in a row',
+        title: Text(
+            widget.size == 3
+                ? 'Classic 3×3'
+                : 'Big 8×8 · ${_game.winLength == 4 ? 'four' : 'five'} in a row',
             style: const TextStyle(fontWeight: FontWeight.w800)),
       ),
       body: SafeArea(
@@ -292,6 +404,7 @@ class _Cell extends StatelessWidget {
     required this.row,
     required this.col,
     required this.highlighted,
+    required this.lastMove,
     required this.radius,
     required this.colors,
     required this.onTap,
@@ -300,6 +413,9 @@ class _Cell extends StatelessWidget {
   final Mark? mark;
   final int row, col;
   final bool highlighted;
+
+  /// Marked with a ring so the player sees the latest move (REQ-PLAT-12).
+  final bool lastMove;
   final double radius;
   final ColorScheme colors;
   final VoidCallback onTap;
@@ -312,6 +428,7 @@ class _Cell extends StatelessWidget {
     return Semantics(
       button: true,
       label: 'Row ${row + 1}, column ${col + 1}, ${mark?.symbol ?? 'empty'}',
+      value: lastMove ? 'last move' : null,
       excludeSemantics: true,
       child: AnimatedContainer(
         duration: motion(context, 350),
@@ -321,8 +438,15 @@ class _Cell extends StatelessWidget {
           color: highlighted
               ? ArenaColors.win.withValues(alpha: 0.45)
               : colors.surfaceContainerHighest,
+          border: lastMove
+              ? Border.all(color: colors.primary, width: radius > 10 ? 3 : 2)
+              : null,
           boxShadow: highlighted
-              ? [BoxShadow(color: ArenaColors.win.withValues(alpha: 0.5), blurRadius: 12)]
+              ? [
+                  BoxShadow(
+                      color: ArenaColors.win.withValues(alpha: 0.5),
+                      blurRadius: 12)
+                ]
               : null,
         ),
         child: Material(
@@ -360,8 +484,8 @@ class _PlayerChip extends StatelessWidget {
               ? color.withValues(alpha: 0.16)
               : Theme.of(context).colorScheme.surface.withValues(alpha: 0.6),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-              color: active ? color : Colors.transparent, width: 2),
+          border:
+              Border.all(color: active ? color : Colors.transparent, width: 2),
         ),
         child: Row(children: [
           SizedBox.square(dimension: 28, child: MarkView(mark: mark)),
