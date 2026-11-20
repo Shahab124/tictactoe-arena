@@ -7,5 +7,64 @@ service cloud.firestore {
     match /users/{uid}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
+
+    // Online games (REQ-ONL-02, 04, 06). Any signed-in player can look up a
+    // room by its code; only the two players can change it, and only by
+    // joining, playing their own turn, leaving, or claiming a timed-out game.
+    match /rooms/{code} {
+      function d() { return resource.data; }
+      function n() { return request.resource.data; }
+      function me() { return request.auth.uid; }
+      function myMark() { return d().x == me() ? 'X' : 'O'; }
+      function otherMark() { return d().x == me() ? 'O' : 'X'; }
+      function turn() { return d().moves.size() % 2 == 0 ? 'X' : 'O'; }
+      function fixed() {
+        return n().x == d().x && n().size == d().size
+          && n().winLength == d().winLength;
+      }
+      function joining() {
+        return d().status == 'waiting' && d().o == null && me() != d().x
+          && n().o == me() && n().players == [d().x, me()]
+          && n().status == 'playing' && n().moves == d().moves
+          && n().lastMoveAt == request.time;
+      }
+      function asBefore() {
+        return n().o == d().o && n().players == d().players;
+      }
+      // One new move on an empty cell, by the player whose turn it is.
+      // ponytail: the win a mover reports isn't re-checked here; the app
+      // works it out with the game engine. Move it to a Cloud Function if
+      // cheating matters.
+      function moving() {
+        return turn() == myMark() && asBefore()
+          && n().moves.size() == d().moves.size() + 1
+          && (d().moves.size() == 0 || n().moves[0:d().moves.size()] == d().moves)
+          && n().moves[d().moves.size()] is int
+          && n().moves[d().moves.size()] >= 0
+          && n().moves[d().moves.size()] < d().size * d().size
+          && !(n().moves[d().moves.size()] in d().moves)
+          && n().lastMoveAt == request.time
+          && (n().status == 'playing' || n().status == 'over');
+      }
+      function ending(winner, reason) {
+        return asBefore() && n().moves == d().moves && n().status == 'over'
+          && n().winner == winner && n().reason == reason;
+      }
+      function leaving() { return ending(otherMark(), 'left'); }
+      function timingOut() {
+        return turn() != myMark()
+          && request.time > d().lastMoveAt + duration.value(60, 's')
+          && ending(myMark(), 'timeout');
+      }
+
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && n().x == me() && n().o == null && n().players == [me()]
+        && n().status == 'waiting' && n().moves == []
+        && n().size in [3, 8];
+      allow update: if request.auth != null && fixed() && (joining()
+        || (me() in d().players && d().status == 'playing'
+            && (moving() || leaving() || timingOut())));
+    }
   }
 }
