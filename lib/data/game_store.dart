@@ -33,7 +33,81 @@ class GameStore {
           _guestKey, [...saved, jsonEncode(game.toMap())]);
       return;
     }
-    _games(uid).add(game.toMap()).ignore();
+    _games(uid).doc(_id(game)).set(game.toMap()).ignore();
+  }
+
+  // The same game always gets the same id, so an upload that is retried after
+  // reconnecting, or guest games moved twice, can't make duplicates
+  // (REQ-DATA-05).
+  // ponytail: two different games only clash if they end in the same
+  // microsecond with the same result and move count.
+  static String _id(GameRecord game) =>
+      '${game.playedAt.toUtc().microsecondsSinceEpoch}'
+      '-${game.result}-${game.moves.length}';
+
+  DocumentReference<Map<String, dynamic>> _state(String uid, String name) =>
+      firestore.collection('users').doc(uid).collection('state').doc(name);
+
+  Future<Map<String, dynamic>?> _read(String name, String? uid) async {
+    if (uid == null) {
+      final s = prefs.getString(name);
+      return s == null ? null : jsonDecode(s) as Map<String, dynamic>;
+    }
+    return (await _state(uid, name).get()).data();
+  }
+
+  Future<void> _write(String name, Map<String, dynamic>? data, String? uid) {
+    if (uid == null) {
+      return data == null
+          ? prefs.remove(name)
+          : prefs.setString(name, jsonEncode(data));
+    }
+    // Not awaited, like [save]: Firestore uploads it once back online.
+    final doc = _state(uid, name);
+    (data == null ? doc.delete() : doc.set(data)).ignore();
+    return Future.value();
+  }
+
+  /// The player's last game setup choices, kept in their account so they
+  /// follow them to a new device (REQ-DATA-04).
+  Future<Map<String, dynamic>?> loadSettings({String? uid}) =>
+      _read('settings', uid);
+
+  Future<void> saveSettings(Map<String, dynamic> settings, {String? uid}) =>
+      _write('settings', settings, uid);
+
+  /// The unfinished game, so it can be continued after closing the app or on
+  /// another device (REQ-DATA-06). Null clears it.
+  Future<Map<String, dynamic>?> loadCurrent({String? uid}) =>
+      _read('current', uid);
+
+  Future<void> saveCurrent(Map<String, dynamic>? game, {String? uid}) =>
+      _write('current', game, uid);
+
+  /// Moves games played as a guest on this device into [uid]'s account, so a
+  /// guest who signs up keeps their history (REQ-ACC-03).
+  Future<void> moveGuestGames(String uid) async {
+    final saved = prefs.getStringList(_guestKey) ?? [];
+    if (saved.isEmpty) return;
+    final batch = firestore.batch();
+    for (final s in saved) {
+      final game = jsonDecode(s) as Map<String, dynamic>;
+      batch.set(_games(uid).doc(_id(GameRecord.fromMap(game))), game);
+    }
+    await prefs.remove(_guestKey);
+    batch.commit().ignore(); // Synced in the background, like [save].
+  }
+
+  /// Deletes every saved game of [uid] (REQ-ACC-07).
+  Future<void> deleteAll(String uid) async {
+    // ponytail: one batch holds 500 writes; chunk it if players pass 500 games.
+    final batch = firestore.batch();
+    for (final doc in (await _games(uid).get()).docs) {
+      batch.delete(doc.reference);
+    }
+    batch.delete(_state(uid, 'settings'));
+    batch.delete(_state(uid, 'current'));
+    await batch.commit();
   }
 
   /// All saved games, newest first.

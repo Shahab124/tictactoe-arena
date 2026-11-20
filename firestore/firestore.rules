@@ -7,5 +7,15 @@ service cloud.firestore {
     match /users/{uid}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
+
+    // One doc per username, so usernames are unique (REQ-ACC-05). Taking a
+    // name that exists would be an update, which is never allowed.
+    match /usernames/{name} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && name.matches('^[a-z0-9_]{3,15}$');
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
   }
 }
