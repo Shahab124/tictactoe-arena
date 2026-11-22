@@ -36,6 +36,29 @@ class GameStore {
     _games(uid).add(game.toMap()).ignore();
   }
 
+  /// Moves games played as a guest on this device into [uid]'s account, so a
+  /// guest who signs up keeps their history (REQ-ACC-03).
+  Future<void> moveGuestGames(String uid) async {
+    final saved = prefs.getStringList(_guestKey) ?? [];
+    if (saved.isEmpty) return;
+    final batch = firestore.batch();
+    for (final s in saved) {
+      batch.set(_games(uid).doc(), jsonDecode(s) as Map<String, dynamic>);
+    }
+    await prefs.remove(_guestKey);
+    batch.commit().ignore(); // Synced in the background, like [save].
+  }
+
+  /// Deletes every saved game of [uid] (REQ-ACC-07).
+  Future<void> deleteAll(String uid) async {
+    // ponytail: one batch holds 500 writes; chunk it if players pass 500 games.
+    final batch = firestore.batch();
+    for (final doc in (await _games(uid).get()).docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
+  }
+
   /// All saved games, newest first.
   Future<List<GameRecord>> history({String? uid}) async {
     final games = uid == null

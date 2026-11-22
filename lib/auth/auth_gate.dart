@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -5,6 +7,7 @@ import '../data/game_store.dart';
 import '../data/history_screen.dart';
 import '../game/setup_screen.dart';
 import '../ui/theme.dart';
+import 'profile.dart';
 import 'sign_in_screen.dart';
 
 /// Shows the sign-in screen until the player signs in or chooses guest play.
@@ -24,6 +27,22 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   // Guests have no Firebase account; their games stay on the device (D3, REQ-DATA 1.1b).
   bool _guest = false;
+  late final StreamSubscription<User?> _signIns;
+
+  @override
+  void initState() {
+    super.initState();
+    // A guest who signs up or signs in keeps the games they played (REQ-ACC-03).
+    _signIns = widget.auth.authStateChanges().listen((user) {
+      if (user != null) widget.store.moveGuestGames(user.uid);
+    });
+  }
+
+  @override
+  void dispose() {
+    _signIns.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,6 +58,15 @@ class _AuthGateState extends State<AuthGate> {
         }
         return HomeScreen(
           name: user?.email ?? user?.displayName ?? 'Guest',
+          // Guests go back to the sign-in screen to create an account.
+          signOutLabel: user == null ? 'Sign up' : 'Sign out',
+          onProfile: user == null
+              ? null
+              : () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => ProfileScreen(
+                      auth: widget.auth,
+                      profiles: Profiles(widget.store.firestore),
+                      store: widget.store))),
           onSignOut: () async {
             setState(() => _guest = false);
             await widget.auth.signOut();
@@ -60,12 +88,15 @@ class HomeScreen extends StatelessWidget {
   const HomeScreen({
     super.key,
     required this.name,
+    this.signOutLabel = 'Sign out',
+    this.onProfile,
     required this.onSignOut,
     required this.onHistory,
     required this.onPlay,
   });
 
-  final String name;
+  final String name, signOutLabel;
+  final VoidCallback? onProfile;
   final VoidCallback onSignOut;
   final VoidCallback onHistory;
   final void Function(int size) onPlay;
@@ -92,7 +123,12 @@ class HomeScreen extends StatelessWidget {
         title: const Text('TicTacToe Arena',
             style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
-          TextButton(onPressed: onSignOut, child: const Text('Sign out')),
+          if (onProfile != null)
+            IconButton(
+                onPressed: onProfile,
+                tooltip: 'Profile',
+                icon: const Icon(Icons.account_circle_outlined)),
+          TextButton(onPressed: onSignOut, child: Text(signOutLabel)),
         ],
       ),
       body: Center(
