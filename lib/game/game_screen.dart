@@ -26,7 +26,39 @@ class GameScreen extends StatefulWidget {
     this.playerMark = Mark.x,
     this.firstToMove = Mark.x,
     this.bestOf = 1,
+    this.resumeMoves = const [],
+    this.resumeWins = const {},
   });
+
+  /// Continues an unfinished game saved by the game screen (REQ-DATA-06).
+  factory GameScreen.resume(Map<String, dynamic> saved,
+      {required GameStore store, String? uid, AiClient ai = localAi}) {
+    Mark mark(Object? s) => s == 'O' ? Mark.o : Mark.x;
+    final wins = (saved['wins'] as Map?) ?? {};
+    return GameScreen(
+      size: saved['size'] as int,
+      store: store,
+      uid: uid,
+      ai: ai,
+      difficulty: saved['difficulty'] as String?,
+      winLength: saved['winLength'] as int?,
+      playerMark: mark(saved['playerMark']),
+      firstToMove: mark(saved['firstToMove']),
+      bestOf: saved['bestOf'] as int? ?? 1,
+      resumeMoves: [
+        for (final m in saved['moves'] as List)
+          ((m as Map)['r'] as int, m['c'] as int)
+      ],
+      resumeWins: {
+        Mark.x: wins['X'] as int? ?? 0,
+        Mark.o: wins['O'] as int? ?? 0,
+      },
+    );
+  }
+
+  /// Moves already played and the match score, when continuing a game.
+  final List<(int, int)> resumeMoves;
+  final Map<Mark, int> resumeWins;
 
   final int size;
 
@@ -77,7 +109,11 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
-    if (_vsComputer && widget.firstToMove == _aiMark) {
+    for (final (r, c) in widget.resumeMoves) {
+      _game.play(r, c);
+    }
+    _wins.addAll(widget.resumeWins);
+    if (_vsComputer && !_game.isOver && _game.sideToMove == _aiMark) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _computerTurn());
     }
   }
@@ -95,6 +131,7 @@ class _GameScreenState extends State<GameScreen> {
     }
     if (result != MoveResult.ok) return; // game over: ignore (D3 REQ-PLAT 6.1)
     setState(() => _hint = null);
+    _persist();
     if (_game.isOver) {
       _finish();
     } else if (_vsComputer) {
@@ -133,6 +170,7 @@ class _GameScreenState extends State<GameScreen> {
       _thinking = false;
       _aiFailed = !played;
     });
+    _persist();
     if (game.isOver) _finish();
   }
 
@@ -166,7 +204,30 @@ class _GameScreenState extends State<GameScreen> {
     setState(() {
       if (winner != null) _wins[winner] = _wins[winner]! + 1;
     });
+    _persist();
   }
+
+  // Keeps the unfinished game in the store after every change, so it can be
+  // continued after closing the app or on another device (REQ-DATA-06).
+  // Between games of a match only the score is kept.
+  void _persist() {
+    final moves = _game.isOver ? const <(int, int)>[] : _game.moves;
+    final done = _game.isOver && (widget.bestOf == 1 || _matchOver);
+    final fresh = moves.isEmpty && _wins.values.every((w) => w == 0);
+    widget.store.saveCurrent(done || fresh ? null : _toSaved(moves),
+        uid: widget.uid);
+  }
+
+  Map<String, dynamic> _toSaved(List<(int, int)> moves) => {
+        'size': widget.size,
+        'winLength': widget.winLength,
+        'difficulty': widget.difficulty,
+        'playerMark': widget.playerMark.symbol,
+        'firstToMove': widget.firstToMove.symbol,
+        'bestOf': widget.bestOf,
+        'moves': [for (final (r, c) in moves) {'r': r, 'c': c}],
+        'wins': {'X': _wins[Mark.x], 'O': _wins[Mark.o]},
+      };
 
   // Rematch, Restart, Next game or New match.
   void _restart() {
@@ -177,6 +238,7 @@ class _GameScreenState extends State<GameScreen> {
       _aiFailed = false;
       _hint = null;
     });
+    _persist();
     if (_vsComputer && widget.firstToMove == _aiMark) _computerTurn();
   }
 
@@ -188,12 +250,15 @@ class _GameScreenState extends State<GameScreen> {
       !_game.isOver &&
       _game.moves.length > (widget.firstToMove == _aiMark ? 1 : 0);
 
-  void _undo() => setState(() {
-        if (_game.sideToMove == widget.playerMark) _game.undo();
-        _game.undo();
-        _aiFailed = false;
-        _hint = null;
-      });
+  void _undo() {
+    setState(() {
+      if (_game.sideToMove == widget.playerMark) _game.undo();
+      _game.undo();
+      _aiFailed = false;
+      _hint = null;
+    });
+    _persist();
+  }
 
   String get _opponent {
     final d = widget.difficulty!;
