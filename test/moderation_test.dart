@@ -26,8 +26,8 @@ void main() {
   });
 
   test('suspending closes the report and blocks online play; dismiss closes it', () async {
-    await mod.report('ayesha', 'omar');
-    await mod.report('zara', 'ali');
+    await mod.report('ayesha', 'omar', room: 'ABCDE');
+    await mod.report('zara', 'ali', room: 'FGHIJ');
     final [first, second] = await mod.openReports();
     await mod.suspend(first, 'boss');
     await mod.dismiss(second, 'boss');
@@ -53,8 +53,19 @@ void main() {
     expect(await mod.blocked('me'), {'troll'});
   });
 
+  test('matchmaking skips a player who blocked the searcher', () async {
+    await mod.block('troll', 'me');
+    await fs.doc('queue/troll').set({
+      'rating': 1200, 'size': 3, 'since': Timestamp.now(), 'room': null,
+    });
+    final mm = Matchmaker(fs, Ratings(fs));
+
+    expect(await mm.findOrWait('me', now: DateTime.now()), isNull);
+    expect((await fs.doc('queue/me').get()).exists, isTrue);
+  });
+
   testWidgets('admin screen lists reports and suspends with one tap', (tester) async {
-    await mod.report('ayesha', 'omar', reason: 'spam');
+    await mod.report('ayesha', 'omar', room: 'ABCDE', reason: 'spam');
     await tester.pumpWidget(MaterialApp(home: AdminScreen(moderation: mod, uid: 'boss')));
     await tester.pumpAndSettle();
     expect(find.text('Reported player: omar'), findsOneWidget);

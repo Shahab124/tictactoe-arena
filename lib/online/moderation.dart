@@ -27,9 +27,12 @@ class Moderation {
   DocumentReference<Map<String, dynamic>> _user(String uid) =>
       firestore.collection('users').doc(uid);
 
+  CollectionReference<Map<String, dynamic>> _blockedUsers(String uid) =>
+      _user(uid).collection('blocked');
+
   /// Reports [reported] after the online game in [room].
   Future<void> report(String reporter, String reported,
-          {String? room, String reason = ''}) =>
+          {required String room, String reason = ''}) =>
       firestore.collection('reports').add({
         'reporter': reporter,
         'reported': reported,
@@ -40,12 +43,24 @@ class Moderation {
       });
 
   /// Blocks [other], so matchmaking never pairs them with [uid] again.
-  Future<void> block(String uid, String other) => _user(uid).set({
-        'blocked': FieldValue.arrayUnion([other])
-      }, SetOptions(merge: true));
+  Future<void> block(String uid, String other) async {
+    final batch = firestore.batch()
+      ..set(
+        _user(uid),
+        {'blocked': FieldValue.arrayUnion([other])},
+        SetOptions(merge: true),
+      )
+      ..set(_blockedUsers(uid).doc(other), {
+        'at': FieldValue.serverTimestamp(),
+      });
+    await batch.commit();
+  }
 
   Future<Set<String>> blocked(String uid) async =>
       {...?((await _user(uid).get()).data()?['blocked'] as List?)?.cast<String>()};
+
+  Future<bool> isBlockedBy(String blocker, String uid) async =>
+      (await _blockedUsers(blocker).doc(uid).get()).exists;
 
   Future<bool> isAdmin(String uid) async =>
       (await firestore.collection('admins').doc(uid).get()).exists;

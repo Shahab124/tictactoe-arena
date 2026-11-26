@@ -80,7 +80,7 @@ void main() {
     expect(xs, findsOneWidget);
     expect(find.text('Your turn'), findsOneWidget);
   });
-
+// Returns the first available cell to keep computer moves predictable in tests.
   testWidgets('four in a row wins on 8×8 when chosen', (tester) async {
     await tester.pumpWidget(MaterialApp(
         home: GameScreen(size: 8, winLength: 4, store: await newStore())));
@@ -164,7 +164,7 @@ void main() {
     expect(find.text('X wins the match!'), findsOneWidget);
     expect(find.text('Best of 3 · X 2 – 0 O'), findsOneWidget);
     expect(await store.history(), hasLength(2));
-
+// Returns the first available cell to keep computer moves predictable in tests.
     await tester.tap(find.text('New match'));
     await tester.pumpAndSettle();
     expect(find.text('Best of 3 · X 0 – 0 O'), findsOneWidget);

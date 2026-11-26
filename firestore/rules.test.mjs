@@ -60,7 +60,8 @@ test("usernames are unique and can't be taken or claimed for someone else", asyn
 // Online rooms (SCRUM-29).
 const room = (extra = {}) => ({
   size: 3, winLength: 3, x: 'ayesha', o: null, players: ['ayesha'],
-  moves: [], status: 'waiting', winner: null, reason: null, lastMoveAt: null, ...extra,
+  moves: [], status: 'waiting', winner: null, reason: null, lastMoveAt: null,
+  completedAt: null, ...extra,
 });
 const playing = (extra = {}) =>
   room({ o: 'omar', players: ['ayesha', 'omar'], status: 'playing', lastMoveAt: new Date(), ...extra });
@@ -102,19 +103,40 @@ test('someone not in the game cannot change it or join a full room', async () =>
 test('a player who leaves loses, and cannot hand themselves the win', async () => {
   await seed(playing());
   await assertFails(updateDoc(doc(db('omar'), 'rooms/ABCDE'), { status: 'over', winner: 'O', reason: 'left' }));
-  await assertSucceeds(updateDoc(doc(db('omar'), 'rooms/ABCDE'), { status: 'over', winner: 'X', reason: 'left' }));
+  await assertFails(updateDoc(doc(db('omar'), 'rooms/ABCDE'), {
+    status: 'over', winner: 'X', reason: 'left',
+  }));
+  await assertSucceeds(updateDoc(doc(db('omar'), 'rooms/ABCDE'), {
+    status: 'over', winner: 'X', reason: 'left', completedAt: serverTimestamp(),
+  }));
 });
 
 test('a win on time can be claimed only after 60 seconds', async () => {
-  const claim = () => updateDoc(doc(db('omar'), 'rooms/ABCDE'), { status: 'over', winner: 'O', reason: 'timeout' });
+  const claim = () => updateDoc(doc(db('omar'), 'rooms/ABCDE'), {
+    status: 'over', winner: 'O', reason: 'timeout', completedAt: serverTimestamp(),
+  });
   await seed(playing());                                          // X to move, just started.
   await assertFails(claim());
   await seed(playing({ lastMoveAt: new Date(Date.now() - 61000) }));
   await assertSucceeds(claim());
 });
 
+test('a winning move records its server completion time', async () => {
+  await seed(playing({ moves: [0, 3, 1, 4] }));
+  const win = (completedAt) => updateDoc(doc(db('ayesha'), 'rooms/ABCDE'), {
+    moves: [0, 3, 1, 4, 2],
+    status: 'over',
+    winner: 'X',
+    reason: 'line',
+    lastMoveAt: serverTimestamp(),
+    ...(completedAt ? { completedAt } : {}),
+  });
+  await assertFails(win(null));
+  await assertSucceeds(win(serverTimestamp()));
+});
+
 // Ratings (SCRUM-30).
-const over = room({ o: 'omar', players: ['ayesha', 'omar'], status: 'over', winner: 'X', reason: 'line', moves: [0, 3, 1, 4, 2] });
+const over = room({ o: 'omar', players: ['ayesha', 'omar'], status: 'over', winner: 'X', reason: 'line', moves: [0, 3, 1, 4, 2], completedAt: new Date() });
 const rate = (uid, code = 'ABCDE') => {
   const fs = db(uid);
   const batch = writeBatch(fs);
@@ -165,14 +187,36 @@ test('a waiting player is matched only with a room just created by the matcher',
 
 // Moderation (SCRUM-32).
 test('players report others but cannot read reports; admins can', async () => {
-  const report = (uid, about) => setDoc(doc(db(uid), `reports/r-${uid}`), { reporter: uid, reported: about, room: 'ABCDE', reason: '', status: 'open' });
-  await assertSucceeds(report('ayesha', 'omar'));
-  await assertFails(report('ayesha', 'ayesha'));
-  await assertFails(setDoc(doc(db('ayesha'), 'reports/fake'), { reporter: 'omar', reported: 'zara', status: 'open' }));
-  await assertFails(getDoc(doc(db('ayesha'), 'reports/r-ayesha')));
+  const report = (uid, about, id, room = 'ABCDE') =>
+    setDoc(doc(db(uid), `reports/${id}`), {
+      reporter: uid, reported: about, room, reason: '', status: 'open',
+    });
+  await seed(over);
+  await assertSucceeds(report('ayesha', 'omar', 'valid'));
+  await assertFails(report('ayesha', 'ayesha', 'self'));
+  await assertFails(report('zara', 'omar', 'not-a-player'));
+  await assertFails(report('ayesha', 'zara', 'reported-not-a-player'));
+  await assertFails(report('ayesha', 'omar', 'missing-room', 'NOPE1'));
+  await seed(playing());
+  await assertFails(report('ayesha', 'omar', 'unfinished-room'));
+  await assertFails(setDoc(doc(db('ayesha'), 'reports/fake'), {
+    reporter: 'omar', reported: 'zara', room: 'ABCDE', status: 'open',
+  }));
+  await assertFails(getDoc(doc(db('ayesha'), 'reports/valid')));
   await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'admins/boss'), { since: 1 }));
-  await assertSucceeds(getDoc(doc(db('boss'), 'reports/r-ayesha')));
-  await assertSucceeds(updateDoc(doc(db('boss'), 'reports/r-ayesha'), { status: 'suspended' }));
+  await assertSucceeds(getDoc(doc(db('boss'), 'reports/valid')));
+  await assertSucceeds(updateDoc(doc(db('boss'), 'reports/valid'), { status: 'suspended' }));
+});
+
+test('block markers are readable only by the blocker and blocked player', async () => {
+  const marker = 'users/ayesha/blocked/omar';
+  await assertSucceeds(setDoc(doc(db('ayesha'), marker), { at: serverTimestamp() }));
+  await assertSucceeds(getDoc(doc(db('ayesha'), marker)));
+  await assertSucceeds(getDoc(doc(db('omar'), marker)));
+  await assertFails(getDoc(doc(db('zara'), marker)));
+  await assertFails(setDoc(doc(db('omar'), 'users/ayesha/blocked/zara'), {
+    at: serverTimestamp(),
+  }));
 });
 
 test('only admins suspend, and nobody can make themselves an admin', async () => {
@@ -180,6 +224,9 @@ test('only admins suspend, and nobody can make themselves an admin', async () =>
   await assertFails(setDoc(doc(db('ayesha'), 'suspended/omar'), { by: 'ayesha' }));
   await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'admins/boss'), { since: 1 }));
   await assertSucceeds(setDoc(doc(db('boss'), 'suspended/omar'), { by: 'boss' }));
+  await assertSucceeds(getDoc(doc(db('omar'), 'suspended/omar')));
+  await assertFails(getDoc(doc(db('ayesha'), 'suspended/omar')));
+  await assertSucceeds(getDoc(doc(db('boss'), 'suspended/omar')));
 });
 
 test('a suspended player cannot create, join or queue for online games', async () => {

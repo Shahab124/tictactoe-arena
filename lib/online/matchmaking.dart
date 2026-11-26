@@ -19,7 +19,7 @@ int allowedGap(Duration waited) =>
 /// joins it as O. Leaving the queue deletes the doc.
 class Matchmaker {
   Matchmaker(this.firestore, this.ratings, {Random? random})
-      : _random = random ?? Random.secure();
+    : _random = random ?? Random.secure();
 
   final FirebaseFirestore firestore;
   final Ratings ratings;
@@ -33,9 +33,10 @@ class Matchmaker {
   /// Matches [uid] with a waiting player and returns the new room code, or
   /// puts [uid] in the queue and returns null.
   Future<String?> findOrWait(String uid, {int size = 3, DateTime? now}) async {
-    final time = now ?? DateTime.now();
+    final time = now ?? await ratings.serverNow(uid);
     final mine = (await ratings.of(uid)).rating;
-    final blocked = await Moderation(firestore).blocked(uid);
+    final moderation = Moderation(firestore);
+    final blocked = await moderation.blocked(uid);
     int gap(QueryDocumentSnapshot<Map<String, dynamic>> d) =>
         ((d.data()['rating'] as int? ?? startRating) - mine).abs();
     final waiting = (await _queue
@@ -53,6 +54,7 @@ class Matchmaker {
       ..sort((a, b) => gap(a).compareTo(gap(b)));
 
     for (final candidate in waiting) {
+      if (await moderation.isBlockedBy(candidate.id, uid)) continue;
       final code = await _pair(uid, candidate.reference, size);
       if (code != null) return code;
     }
@@ -68,14 +70,33 @@ class Matchmaker {
   // Creates a room with [uid] as X and hands its code to the waiting player,
   // unless someone else got to them first.
   Future<String?> _pair(
-      String uid, DocumentReference<Map<String, dynamic>> other, int size) {
+    String uid,
+    DocumentReference<Map<String, dynamic>> other,
+    int size,
+  ) {
     final code = List.generate(
-        5, (_) => _letters[_random.nextInt(_letters.length)]).join();
+      5,
+      (_) => _letters[_random.nextInt(_letters.length)],
+    ).join();
     final room = firestore.collection('rooms').doc(code);
+    final blockedByMe = firestore
+        .collection('users')
+        .doc(uid)
+        .collection('blocked')
+        .doc(other.id);
+    final blockedByOther = firestore
+        .collection('users')
+        .doc(other.id)
+        .collection('blocked')
+        .doc(uid);
     return firestore.runTransaction((t) async {
       final snap = await t.get(other);
       if (!snap.exists || snap.data()!['room'] != null) return null;
       if ((await t.get(room)).exists) return null;
+      if ((await t.get(blockedByMe)).exists ||
+          (await t.get(blockedByOther)).exists) {
+        return null;
+      }
       t.set(room, {
         'size': size,
         'winLength': size == 3 ? 3 : 5,
@@ -87,6 +108,7 @@ class Matchmaker {
         'winner': null,
         'reason': null,
         'lastMoveAt': null,
+        'completedAt': null,
       });
       t.update(other, {'room': code});
       return code;
@@ -94,10 +116,8 @@ class Matchmaker {
   }
 
   /// The room code once someone matches [uid], or null while still waiting.
-  Stream<String?> matched(String uid) => _queue
-      .doc(uid)
-      .snapshots()
-      .map((s) => s.data()?['room'] as String?);
+  Stream<String?> matched(String uid) =>
+      _queue.doc(uid).snapshots().map((s) => s.data()?['room'] as String?);
 
   /// Leaves the queue (also used once matched).
   Future<void> leave(String uid) => _queue.doc(uid).delete();
