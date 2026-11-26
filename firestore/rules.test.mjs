@@ -138,3 +138,27 @@ test('no rating without a finished game, for someone else, or for a game not pla
   await assertFails(setDoc(doc(db('ayesha'), 'ratings/omar'), { rating: 2000, lastRoom: 'ABCDE' }));
   await assertFails(setDoc(doc(db('ayesha'), 'ratings/ayesha'), { rating: 2000, lastRoom: 'ABCDE' })); // No marker.
 });
+
+// Matchmaking queue (SCRUM-33).
+test('players queue and leave only as themselves', async () => {
+  await assertSucceeds(setDoc(doc(db('ayesha'), 'queue/ayesha'), { rating: 1200, size: 3, since: serverTimestamp(), room: null }));
+  await assertFails(setDoc(doc(db('ayesha'), 'queue/omar'), { rating: 1200, size: 3, since: serverTimestamp(), room: null }));
+  await assertFails(deleteDoc(doc(db('omar'), 'queue/ayesha')));
+  await assertSucceeds(deleteDoc(doc(db('ayesha'), 'queue/ayesha')));
+});
+
+test('a waiting player is matched only with a room just created by the matcher', async () => {
+  await env.withSecurityRulesDisabled((ctx) =>
+    setDoc(doc(ctx.firestore(), 'queue/ayesha'), { rating: 1200, size: 3, since: new Date(), room: null }));
+  const fs = db('omar');
+  const pair = (code, x) => {
+    const b = writeBatch(fs);
+    b.set(doc(fs, `rooms/${code}`), room({ x, players: [x] }));
+    b.update(doc(fs, 'queue/ayesha'), { room: code });
+    return b.commit();
+  };
+  await assertFails(updateDoc(doc(fs, 'queue/ayesha'), { room: 'NOPE1' }));          // No room.
+  await assertFails(updateDoc(doc(fs, 'queue/ayesha'), { rating: 2000 }));           // Other fields.
+  await assertSucceeds(pair('MATCH', 'omar'));
+  await assertFails(pair('MATC2', 'omar'));                                         // Already matched.
+});

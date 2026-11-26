@@ -5,6 +5,8 @@ import 'package:game_engine/game_engine.dart';
 
 import '../ui/mark.dart';
 import 'leaderboard_screen.dart';
+import 'match_screen.dart';
+import 'matchmaking.dart';
 import 'online_rooms.dart';
 import 'ratings.dart';
 
@@ -112,7 +114,23 @@ class _OnlineLobbyState extends State<OnlineLobby> {
                   onSelectionChanged: (s) => setState(() => _size = s.first),
                 ),
                 const SizedBox(height: 12),
-                FilledButton(
+                FilledButton.icon(
+                  onPressed: () async {
+                    await Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => MatchScreen(
+                            matchmaker: Matchmaker(
+                                widget.rooms.firestore, widget.ratings),
+                            rooms: widget.rooms,
+                            ratings: widget.ratings,
+                            uid: widget.uid,
+                            size: _size)));
+                    _loadRating();
+                  },
+                  icon: const Icon(Icons.bolt_rounded),
+                  label: const Text('Find a match'),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton(
                   onPressed: () =>
                       _go(() => widget.rooms.create(widget.uid, size: _size)),
                   child: const Text('Create room'),
