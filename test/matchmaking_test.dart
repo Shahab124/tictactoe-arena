@@ -165,6 +165,7 @@ void main() {
     await tester.tap(find.text('Start'));
     await tester.pump();
     await delayed.started.future;
+    await tester.pump(const Duration(milliseconds: 300));
 
     await tester.tap(find.text('Cancel'));
     await tester.pump();
