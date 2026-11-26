@@ -4,13 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:game_engine/game_engine.dart';
 
 import '../ui/mark.dart';
+import 'leaderboard_screen.dart';
 import 'online_rooms.dart';
+import 'ratings.dart';
 
 /// Create a room, join one with a code, or rejoin an unfinished game.
 class OnlineLobby extends StatefulWidget {
-  const OnlineLobby({super.key, required this.rooms, required this.uid});
+  const OnlineLobby(
+      {super.key, required this.rooms, required this.ratings, required this.uid});
 
   final OnlineRooms rooms;
+  final Ratings ratings;
   final String uid;
 
   @override
@@ -22,6 +26,7 @@ class _OnlineLobbyState extends State<OnlineLobby> {
   int _size = 3;
   String? _error;
   Room? _unfinished;
+  Rating? _rating;
 
   @override
   void initState() {
@@ -29,7 +34,12 @@ class _OnlineLobbyState extends State<OnlineLobby> {
     widget.rooms.unfinished(widget.uid).then((room) {
       if (mounted) setState(() => _unfinished = room);
     });
+    _loadRating();
   }
+
+  void _loadRating() => widget.ratings.of(widget.uid).then((r) {
+        if (mounted) setState(() => _rating = r);
+      });
 
   @override
   void dispose() {
@@ -43,8 +53,12 @@ class _OnlineLobbyState extends State<OnlineLobby> {
       if (!mounted) return;
       setState(() => _error = null);
       await Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) =>
-              RoomScreen(rooms: widget.rooms, uid: widget.uid, code: code)));
+          builder: (_) => RoomScreen(
+              rooms: widget.rooms,
+              ratings: widget.ratings,
+              uid: widget.uid,
+              code: code)));
+      _loadRating();
       final room = await widget.rooms.unfinished(widget.uid);
       if (mounted) setState(() => _unfinished = room);
     } on RoomException catch (e) {
@@ -64,6 +78,23 @@ class _OnlineLobbyState extends State<OnlineLobby> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (_rating != null)
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.emoji_events_rounded, size: 32),
+                      title: Text('Your rating: ${_rating!.rating}',
+                          style: const TextStyle(fontWeight: FontWeight.w800)),
+                      subtitle: Text('${_rating!.games} ranked games'),
+                      trailing: TextButton(
+                        onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (_) => LeaderboardScreen(
+                                    ratings: widget.ratings, uid: widget.uid))),
+                        child: const Text('Leaderboards'),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 16),
                 if (_unfinished != null) ...[
                   FilledButton.tonalIcon(
                     onPressed: () => _go(() async => _unfinished!.code),
@@ -113,10 +144,16 @@ class _OnlineLobbyState extends State<OnlineLobby> {
 
 /// One online game, kept up to date as either player moves.
 class RoomScreen extends StatefulWidget {
-  const RoomScreen(
-      {super.key, required this.rooms, required this.uid, required this.code});
+  const RoomScreen({
+    super.key,
+    required this.rooms,
+    required this.ratings,
+    required this.uid,
+    required this.code,
+  });
 
   final OnlineRooms rooms;
+  final Ratings ratings;
   final String uid, code;
 
   @override
@@ -127,6 +164,7 @@ class _RoomScreenState extends State<RoomScreen> {
   late final Stream<Room?> _room = widget.rooms.watch(widget.code);
   // Ticks once a second so the turn clock counts down.
   late final Timer _tick;
+  bool _rated = false;
 
   @override
   void initState() {
@@ -173,6 +211,11 @@ class _RoomScreenState extends State<RoomScreen> {
         }
         final game = room.toGame();
         final playing = room.status == 'playing';
+        // Every online game is ranked; counted once when it ends (REQ-RANK-01).
+        if (room.status == 'over' && !_rated) {
+          _rated = true;
+          widget.ratings.record(room, widget.uid).ignore();
+        }
         return Scaffold(
           appBar: AppBar(
             title: Text('Room ${room.code}'),

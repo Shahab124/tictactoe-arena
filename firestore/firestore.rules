@@ -76,5 +76,30 @@ service cloud.firestore {
         || (me() in d().players && d().status == 'playing'
             && (moving() || leaving() || timingOut())));
     }
+
+    // Ratings (REQ-RANK-01, 02). Anyone signed in can read the leaderboards.
+    // A player changes only their own rating, once per finished online game
+    // they played in; ratings/<uid>/rated/<room code> marks it as counted.
+    match /ratings/{uid} {
+      function room(code) {
+        return get(/databases/$(database)/documents/rooms/$(code)).data;
+      }
+      function marker(code) {
+        return /databases/$(database)/documents/ratings/$(uid)/rated/$(code);
+      }
+      function counted(code) {
+        return room(code).status == 'over' && uid in room(code).players
+          && !exists(marker(code)) && existsAfter(marker(code));
+      }
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.rating is int
+        && counted(request.resource.data.lastRoom);
+      match /rated/{code} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow create: if request.auth != null && request.auth.uid == uid
+          && room(code).status == 'over' && uid in room(code).players;
+      }
+    }
   }
 }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:game_engine/game_engine.dart';
 import 'package:tictactoe_arena/online/online_rooms.dart';
+import 'package:tictactoe_arena/online/ratings.dart';
 import 'package:tictactoe_arena/online/online_screen.dart';
 
 void main() {
@@ -106,7 +107,7 @@ void main() {
       return code;
     }))!;
     await tester.pumpWidget(MaterialApp(
-        home: RoomScreen(rooms: rooms, uid: 'omar', code: code)));
+        home: RoomScreen(rooms: rooms, ratings: Ratings(rooms.firestore), uid: 'omar', code: code)));
     await tester.pump();
     expect(find.text('You are O'), findsOneWidget);
     expect(find.textContaining('Their turn'), findsOneWidget);
@@ -125,7 +126,7 @@ void main() {
 
   testWidgets('lobby creates a room and shows its code', (tester) async {
     await tester.pumpWidget(
-        MaterialApp(home: OnlineLobby(rooms: rooms, uid: 'ayesha')));
+        MaterialApp(home: OnlineLobby(rooms: rooms, ratings: Ratings(rooms.firestore), uid: 'ayesha')));
     await tester.pump();
     await tester.tap(find.text('Create room'));
     await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 50)));

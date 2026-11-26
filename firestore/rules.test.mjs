@@ -6,7 +6,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { deleteDoc, doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 
 const env = await initializeTestEnvironment({
   projectId: 'demo-tictactoe-arena',
@@ -111,4 +111,30 @@ test('a win on time can be claimed only after 60 seconds', async () => {
   await assertFails(claim());
   await seed(playing({ lastMoveAt: new Date(Date.now() - 61000) }));
   await assertSucceeds(claim());
+});
+
+// Ratings (SCRUM-30).
+const over = room({ o: 'omar', players: ['ayesha', 'omar'], status: 'over', winner: 'X', reason: 'line', moves: [0, 3, 1, 4, 2] });
+const rate = (uid, code = 'ABCDE') => {
+  const fs = db(uid);
+  const batch = writeBatch(fs);
+  batch.set(doc(fs, `ratings/${uid}/rated/${code}`), { at: 1 });
+  batch.set(doc(fs, `ratings/${uid}`), { name: uid, rating: 1216, games: 1, week: '2026-W48', weekPoints: 3, lastRoom: code });
+  return batch.commit();
+};
+
+test('a player rates a finished game they played in, once', async () => {
+  await seed(over);
+  await assertSucceeds(rate('ayesha'));
+  await assertFails(rate('ayesha'));                 // Already counted.
+  await assertSucceeds(getDoc(doc(db('zara'), 'ratings/ayesha')));
+});
+
+test('no rating without a finished game, for someone else, or for a game not played', async () => {
+  await seed(playing());
+  await assertFails(rate('ayesha'));                 // Game not over.
+  await seed(over);
+  await assertFails(rate('zara'));                   // Not in the game.
+  await assertFails(setDoc(doc(db('ayesha'), 'ratings/omar'), { rating: 2000, lastRoom: 'ABCDE' }));
+  await assertFails(setDoc(doc(db('ayesha'), 'ratings/ayesha'), { rating: 2000, lastRoom: 'ABCDE' })); // No marker.
 });
