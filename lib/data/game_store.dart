@@ -16,7 +16,7 @@ class GameStore {
 
   final FirebaseFirestore firestore;
   final SharedPreferences prefs;
-
+// Keeps guest games on the device and signed-in games in the user's Firestore account.
   static const _guestKey = 'guest_games';
 
   CollectionReference<Map<String, dynamic>> _games(String uid) =>
@@ -55,7 +55,6 @@ class GameStore {
     }
     return (await _state(uid, name).get()).data();
   }
-
   Future<void> _write(String name, Map<String, dynamic>? data, String? uid) {
     if (uid == null) {
       return data == null
@@ -72,7 +71,7 @@ class GameStore {
   /// follow them to a new device (REQ-DATA-04).
   Future<Map<String, dynamic>?> loadSettings({String? uid}) =>
       _read('settings', uid);
-
+// Transfers locally saved guest games to the account when a player signs up.
   Future<void> saveSettings(Map<String, dynamic> settings, {String? uid}) =>
       _write('settings', settings, uid);
 
