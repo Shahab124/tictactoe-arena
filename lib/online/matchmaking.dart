@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'moderation.dart';
 import 'ratings.dart';
 
 /// How far apart two ratings may be: 100 points at first, widening by 50
@@ -34,6 +35,7 @@ class Matchmaker {
   Future<String?> findOrWait(String uid, {int size = 3, DateTime? now}) async {
     final time = now ?? DateTime.now();
     final mine = (await ratings.of(uid)).rating;
+    final blocked = await Moderation(firestore).blocked(uid);
     int gap(QueryDocumentSnapshot<Map<String, dynamic>> d) =>
         ((d.data()['rating'] as int? ?? startRating) - mine).abs();
     final waiting = (await _queue
@@ -43,7 +45,9 @@ class Matchmaker {
         .docs
         .where((d) {
           final since = (d.data()['since'] as Timestamp?)?.toDate() ?? time;
-          return d.id != uid && gap(d) <= allowedGap(time.difference(since));
+          return d.id != uid &&
+              !blocked.contains(d.id) &&
+              gap(d) <= allowedGap(time.difference(since));
         })
         .toList()
       ..sort((a, b) => gap(a).compareTo(gap(b)));

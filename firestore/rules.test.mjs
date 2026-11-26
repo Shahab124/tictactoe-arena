@@ -162,3 +162,32 @@ test('a waiting player is matched only with a room just created by the matcher',
   await assertSucceeds(pair('MATCH', 'omar'));
   await assertFails(pair('MATC2', 'omar'));                                         // Already matched.
 });
+
+// Moderation (SCRUM-32).
+test('players report others but cannot read reports; admins can', async () => {
+  const report = (uid, about) => setDoc(doc(db(uid), `reports/r-${uid}`), { reporter: uid, reported: about, room: 'ABCDE', reason: '', status: 'open' });
+  await assertSucceeds(report('ayesha', 'omar'));
+  await assertFails(report('ayesha', 'ayesha'));
+  await assertFails(setDoc(doc(db('ayesha'), 'reports/fake'), { reporter: 'omar', reported: 'zara', status: 'open' }));
+  await assertFails(getDoc(doc(db('ayesha'), 'reports/r-ayesha')));
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'admins/boss'), { since: 1 }));
+  await assertSucceeds(getDoc(doc(db('boss'), 'reports/r-ayesha')));
+  await assertSucceeds(updateDoc(doc(db('boss'), 'reports/r-ayesha'), { status: 'suspended' }));
+});
+
+test('only admins suspend, and nobody can make themselves an admin', async () => {
+  await assertFails(setDoc(doc(db('ayesha'), 'admins/ayesha'), { since: 1 }));
+  await assertFails(setDoc(doc(db('ayesha'), 'suspended/omar'), { by: 'ayesha' }));
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'admins/boss'), { since: 1 }));
+  await assertSucceeds(setDoc(doc(db('boss'), 'suspended/omar'), { by: 'boss' }));
+});
+
+test('a suspended player cannot create, join or queue for online games', async () => {
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'suspended/omar'), { by: 'boss' }));
+  await assertFails(setDoc(doc(db('omar'), 'rooms/OMAR1'), room({ x: 'omar', players: ['omar'] })));
+  await assertFails(setDoc(doc(db('omar'), 'queue/omar'), { rating: 1200, size: 3, since: serverTimestamp(), room: null }));
+  await seed(room());
+  await assertFails(updateDoc(doc(db('omar'), 'rooms/ABCDE'), {
+    o: 'omar', players: ['ayesha', 'omar'], status: 'playing', lastMoveAt: serverTimestamp(),
+  }));
+});

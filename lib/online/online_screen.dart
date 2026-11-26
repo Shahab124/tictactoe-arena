@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:game_engine/game_engine.dart';
 
 import '../ui/mark.dart';
+import 'admin_screen.dart';
 import 'leaderboard_screen.dart';
 import 'match_screen.dart';
 import 'matchmaking.dart';
+import 'moderation.dart';
 import 'online_rooms.dart';
 import 'ratings.dart';
 
@@ -29,6 +31,8 @@ class _OnlineLobbyState extends State<OnlineLobby> {
   String? _error;
   Room? _unfinished;
   Rating? _rating;
+  late final _moderation = Moderation(widget.rooms.firestore);
+  bool _suspended = false, _admin = false;
 
   @override
   void initState() {
@@ -37,7 +41,16 @@ class _OnlineLobbyState extends State<OnlineLobby> {
       if (mounted) setState(() => _unfinished = room);
     });
     _loadRating();
+    _moderation.isSuspended(widget.uid).then((s) {
+      if (mounted) setState(() => _suspended = s);
+    });
+    _moderation.isAdmin(widget.uid).then((a) {
+      if (mounted) setState(() => _admin = a);
+    });
   }
+
+  static const _suspendedText =
+      'Your account is suspended, so you cannot play online.';
 
   void _loadRating() => widget.ratings.of(widget.uid).then((r) {
         if (mounted) setState(() => _rating = r);
@@ -50,6 +63,7 @@ class _OnlineLobbyState extends State<OnlineLobby> {
   }
 
   Future<void> _go(Future<String> Function() getCode) async {
+    if (_suspended) return setState(() => _error = _suspendedText);
     try {
       final code = await getCode();
       if (!mounted) return;
@@ -97,6 +111,26 @@ class _OnlineLobbyState extends State<OnlineLobby> {
                     ),
                   ),
                 const SizedBox(height: 16),
+                if (_admin) ...[
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => AdminScreen(
+                            moderation: _moderation, uid: widget.uid))),
+                    icon: const Icon(Icons.admin_panel_settings_rounded),
+                    label: const Text('Admin dashboard'),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (_suspended) ...[
+                  Card(
+                    color: Theme.of(context).colorScheme.errorContainer,
+                    child: const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text(_suspendedText),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 if (_unfinished != null) ...[
                   FilledButton.tonalIcon(
                     onPressed: () => _go(() async => _unfinished!.code),
@@ -116,6 +150,9 @@ class _OnlineLobbyState extends State<OnlineLobby> {
                 const SizedBox(height: 12),
                 FilledButton.icon(
                   onPressed: () async {
+                    if (_suspended) {
+                      return setState(() => _error = _suspendedText);
+                    }
                     await Navigator.of(context).push(MaterialPageRoute(
                         builder: (_) => MatchScreen(
                             matchmaker: Matchmaker(
@@ -269,6 +306,13 @@ class _RoomScreenState extends State<RoomScreen> {
                           widget.rooms.claimTimeout(room, widget.uid),
                       child: const Text('Claim win'),
                     ),
+                  if (room.status == 'over' && room.o != null)
+                    _ReportBlock(
+                      uid: widget.uid,
+                      other: me == Mark.x ? room.o! : room.x,
+                      room: room.code,
+                      moderation: Moderation(widget.rooms.firestore),
+                    ),
                   const SizedBox(height: 16),
                   Flexible(
                     child: AspectRatio(
@@ -310,5 +354,66 @@ class _RoomScreenState extends State<RoomScreen> {
         ),
       ),
     );
+  }
+}
+
+/// Report or block the other player after an online game (REQ-ONL-08).
+class _ReportBlock extends StatefulWidget {
+  const _ReportBlock({
+    required this.uid,
+    required this.other,
+    required this.room,
+    required this.moderation,
+  });
+
+  final String uid, other, room;
+  final Moderation moderation;
+
+  @override
+  State<_ReportBlock> createState() => _ReportBlockState();
+}
+
+class _ReportBlockState extends State<_ReportBlock> {
+  String? _done;
+
+  Future<void> _report() async {
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        final text = TextEditingController();
+        return AlertDialog(
+          title: const Text('Report player'),
+          content: TextField(
+            controller: text,
+            decoration: const InputDecoration(labelText: 'What happened? (optional)'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, text.text.trim()),
+                child: const Text('Report')),
+          ],
+        );
+      },
+    );
+    if (reason == null) return;
+    await widget.moderation.report(widget.uid, widget.other, room: widget.room, reason: reason);
+    if (mounted) setState(() => _done = 'Reported. An admin will review it.');
+  }
+
+  Future<void> _block() async {
+    await widget.moderation.block(widget.uid, widget.other);
+    if (mounted) setState(() => _done = 'Blocked. You won\'t be matched with them again.');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_done != null) return Padding(padding: const EdgeInsets.only(top: 8), child: Text(_done!));
+    return Wrap(spacing: 8, children: [
+      TextButton.icon(
+          onPressed: _report, icon: const Icon(Icons.flag_outlined), label: const Text('Report')),
+      TextButton.icon(
+          onPressed: _block, icon: const Icon(Icons.block), label: const Text('Block')),
+    ]);
   }
 }
