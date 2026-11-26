@@ -1,5 +1,5 @@
 /// A finished game, as saved to history (D3 section 2.4, REQ-DATA-01).
-///
+/////
 /// [result] is from the saving player's side: 'win', 'loss' or 'draw'.
 class GameRecord {
   const GameRecord({

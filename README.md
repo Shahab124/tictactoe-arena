@@ -98,7 +98,8 @@ if (reply.containsKey('error')) {
   "difficulty": "hard"
 }
 ```
-
+<!--  functional and  non-functional requirements in D3. -->
+<!--  Responsible for Android and web testing and quality assurance. -->
 ### Response
 
 A move, using the same row and column numbering as the board:
