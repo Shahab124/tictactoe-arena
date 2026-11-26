@@ -25,8 +25,6 @@ void main() {
 
   test('requestMove meets its response-time limits on worst-case boards', () {
     for (final difficulty in difficulties) {
-      var slowestForDifficulty = Duration.zero;
-
       for (final scenario in scenarios) {
         final request = <String, Object>{
           'board': scenario.board,
@@ -54,13 +52,8 @@ void main() {
             reason:
                 '$difficulty on ${scenario.name} took $elapsed; limit is ${scenario.limit}',
           );
-          if (elapsed > slowestForDifficulty) {
-            slowestForDifficulty = elapsed;
-          }
         }
       }
-
-      print('$difficulty slowest requestMove: $slowestForDifficulty');
     }
   });
 }
