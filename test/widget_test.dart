@@ -8,7 +8,7 @@ import 'package:tictactoe_arena/auth/sign_in_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tictactoe_arena/data/game_store.dart';
 import 'package:tictactoe_arena/main.dart';
-
+// Enters email and password into the sign-in form during widget tests.
 Future<void> enter(WidgetTester tester, String email, String password) async {
   await tester.enterText(find.widgetWithText(TextField, 'Email'), email);
   await tester.enterText(find.widgetWithText(TextField, 'Password'), password);
