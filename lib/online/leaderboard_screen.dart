@@ -59,8 +59,9 @@ class _Board extends StatelessWidget {
           return const Center(child: Text('Could not load the leaderboard.'));
         }
         final rows = snap.data;
-        if (rows == null)
+        if (rows == null) {
           return const Center(child: CircularProgressIndicator());
+        }
         if (rows.isEmpty) {
           return const Center(
             child: Text(
