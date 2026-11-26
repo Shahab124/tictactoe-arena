@@ -35,7 +35,60 @@ class _SetupScreenState extends State<SetupScreen> {
   bool _youStart = true;
   int _bestOf = 1;
 
+  /// The unfinished game saved by [GameScreen], if any (REQ-DATA-06).
+  Map<String, dynamic>? _current;
+
   bool get _vsComputer => _mode == 'computer';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  // The last choices come from the account, so they follow the player to a
+  // new device (REQ-DATA-04).
+  Future<void> _load() async {
+    final s = await widget.store.loadSettings(uid: widget.uid);
+    final current = await widget.store.loadCurrent(uid: widget.uid);
+    if (!mounted) return;
+    setState(() {
+      _current = current;
+      if (s == null) return;
+      _mode = s['mode'] as String? ?? _mode;
+      _difficulty = s['difficulty'] as String? ?? _difficulty;
+      _winLength = s['winLength'] as int? ?? _winLength;
+      _playerMark = s['playerMark'] == 'O' ? Mark.o : Mark.x;
+      _youStart = s['youStart'] as bool? ?? _youStart;
+      _bestOf = s['bestOf'] as int? ?? _bestOf;
+    });
+  }
+
+  Future<void> _open(GameScreen game) async {
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => game));
+    _load(); // the game may have finished or been left unfinished
+  }
+
+  void _start() {
+    widget.store.saveSettings({
+      'mode': _mode,
+      'difficulty': _difficulty,
+      'winLength': _winLength,
+      'playerMark': _playerMark.symbol,
+      'youStart': _youStart,
+      'bestOf': _bestOf,
+    }, uid: widget.uid);
+    _open(GameScreen(
+        size: _size,
+        store: widget.store,
+        uid: widget.uid,
+        difficulty: _vsComputer ? _difficulty : null,
+        winLength: _size == 8 ? _winLength : null,
+        playerMark: _playerMark,
+        firstToMove: _firstToMove,
+        bestOf: _bestOf));
+  }
 
   // Against the computer "who starts" is you or the computer; in a local
   // game it is X or O.
@@ -72,6 +125,15 @@ class _SetupScreenState extends State<SetupScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (_current != null) ...[
+                    FilledButton.tonalIcon(
+                      onPressed: () => _open(GameScreen.resume(
+                          _current!, store: widget.store, uid: widget.uid)),
+                      icon: const Icon(Icons.play_circle_outline_rounded),
+                      label: const Text('Continue unfinished game'),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
                   Text('Board', style: label),
                   const SizedBox(height: 8),
                   SegmentedButton<int>(
@@ -152,17 +214,7 @@ class _SetupScreenState extends State<SetupScreen> {
                       _bestOf, (v) => _bestOf = v),
                   const SizedBox(height: 32),
                   FilledButton.icon(
-                    onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                            builder: (_) => GameScreen(
-                                size: _size,
-                                store: widget.store,
-                                uid: widget.uid,
-                                difficulty: _vsComputer ? _difficulty : null,
-                                winLength: _size == 8 ? _winLength : null,
-                                playerMark: _playerMark,
-                                firstToMove: _firstToMove,
-                                bestOf: _bestOf))),
+                    onPressed: _start,
                     icon: const Icon(Icons.play_arrow_rounded),
                     label: const Text('Start game'),
                   ),

@@ -13,15 +13,16 @@ const turnLimit = Duration(seconds: 60);
 /// is and the winner can all be worked out from them. X always moves first.
 class Room {
   Room.fromMap(this.code, Map<String, dynamic> d)
-      : size = d['size'] as int,
-        winLength = d['winLength'] as int,
-        x = d['x'] as String,
-        o = d['o'] as String?,
-        moves = List<int>.from(d['moves'] as List),
-        status = d['status'] as String,
-        winner = d['winner'] as String?,
-        reason = d['reason'] as String?,
-        lastMoveAt = (d['lastMoveAt'] as Timestamp?)?.toDate();
+    : size = d['size'] as int,
+      winLength = d['winLength'] as int,
+      x = d['x'] as String,
+      o = d['o'] as String?,
+      moves = List<int>.from(d['moves'] as List),
+      status = d['status'] as String,
+      winner = d['winner'] as String?,
+      reason = d['reason'] as String?,
+      lastMoveAt = (d['lastMoveAt'] as Timestamp?)?.toDate(),
+      completedAt = (d['completedAt'] as Timestamp?)?.toDate();
 
   final String code;
   final int size, winLength;
@@ -38,6 +39,7 @@ class Room {
   /// Why it ended: 'line', 'draw', 'left' or 'timeout'.
   final String? reason;
   final DateTime? lastMoveAt;
+  final DateTime? completedAt;
 
   Mark get turn => moves.length.isEven ? Mark.x : Mark.o;
   Mark? markOf(String uid) => uid == x ? Mark.x : (uid == o ? Mark.o : null);
@@ -70,7 +72,7 @@ class RoomException implements Exception {
 /// doesn't lose a move (REQ-ONL-04, 05).
 class OnlineRooms {
   OnlineRooms(this.firestore, {Random? random})
-      : _random = random ?? Random.secure();
+    : _random = random ?? Random.secure();
 
   final FirebaseFirestore firestore;
   final Random _random;
@@ -87,7 +89,9 @@ class OnlineRooms {
     Game(size: size, winLength: length); // Throws on a bad size or length.
     for (var tries = 0; tries < 5; tries++) {
       final code = List.generate(
-          5, (_) => _letters[_random.nextInt(_letters.length)]).join();
+        5,
+        (_) => _letters[_random.nextInt(_letters.length)],
+      ).join();
       final ref = _rooms.doc(code);
       final taken = await firestore.runTransaction((t) async {
         if ((await t.get(ref)).exists) return true;
@@ -102,6 +106,7 @@ class OnlineRooms {
           'winner': null,
           'reason': null,
           'lastMoveAt': null,
+          'completedAt': null,
         });
         return false;
       });
@@ -124,12 +129,15 @@ class OnlineRooms {
         'players': [room.x, uid],
         'status': 'playing',
         'lastMoveAt': FieldValue.serverTimestamp(),
+        'completedAt': null,
       });
     });
   }
 
-  Stream<Room?> watch(String code) => _rooms.doc(code).snapshots().map(
-      (s) => s.exists ? Room.fromMap(s.id, s.data()!) : null);
+  Stream<Room?> watch(String code) => _rooms
+      .doc(code)
+      .snapshots()
+      .map((s) => s.exists ? Room.fromMap(s.id, s.data()!) : null);
 
   /// The game [uid] is still playing, if any, so they can rejoin it.
   Future<Room?> unfinished(String uid) async {
@@ -157,6 +165,7 @@ class OnlineRooms {
     await _rooms.doc(room.code).update({
       'moves': FieldValue.arrayUnion([row * room.size + col]),
       'lastMoveAt': FieldValue.serverTimestamp(),
+      'completedAt': over.isEmpty ? null : FieldValue.serverTimestamp(),
       ...over,
     });
   }
@@ -165,8 +174,12 @@ class OnlineRooms {
   Future<void> leave(Room room, String uid) async {
     final mark = room.markOf(uid);
     if (room.status != 'playing' || mark == null) return;
-    await _rooms.doc(room.code).update(
-        {'status': 'over', 'winner': mark.other.symbol, 'reason': 'left'});
+    await _rooms.doc(room.code).update({
+      'status': 'over',
+      'winner': mark.other.symbol,
+      'reason': 'left',
+      'completedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   /// [uid] claims the win because the other player ran out of time.
@@ -174,7 +187,11 @@ class OnlineRooms {
     final mark = room.markOf(uid);
     if (mark == null || room.turn == mark) return;
     if (!room.timedOut(now ?? DateTime.now())) return;
-    await _rooms.doc(room.code).update(
-        {'status': 'over', 'winner': mark.symbol, 'reason': 'timeout'});
+    await _rooms.doc(room.code).update({
+      'status': 'over',
+      'winner': mark.symbol,
+      'reason': 'timeout',
+      'completedAt': FieldValue.serverTimestamp(),
+    });
   }
 }

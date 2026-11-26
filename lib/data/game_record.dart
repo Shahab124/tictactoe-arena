@@ -1,5 +1,5 @@
 /// A finished game, as saved to history (D3 section 2.4, REQ-DATA-01).
-///
+/////
 /// [result] is from the saving player's side: 'win', 'loss' or 'draw'.
 class GameRecord {
   const GameRecord({
@@ -10,6 +10,7 @@ class GameRecord {
     required this.moves,
     required this.result,
     required this.playedAt,
+    this.firstMark = 'X',
   });
 
   final int boardSize;
@@ -26,6 +27,9 @@ class GameRecord {
   final String result;
   final DateTime playedAt;
 
+  /// 'X' or 'O': who made the first move, so a replay shows the right marks.
+  final String firstMark;
+
   // Firestore can't store nested lists, so each move is a {r, c} map.
   Map<String, dynamic> toMap() => {
         'boardSize': boardSize,
@@ -35,6 +39,7 @@ class GameRecord {
         'moves': [for (final (r, c) in moves) {'r': r, 'c': c}],
         'result': result,
         'playedAt': playedAt.toUtc().toIso8601String(),
+        'firstMark': firstMark,
       };
 
   factory GameRecord.fromMap(Map<String, dynamic> m) => GameRecord(
@@ -48,6 +53,7 @@ class GameRecord {
         ],
         result: m['result'] as String,
         playedAt: DateTime.parse(m['playedAt'] as String),
+        firstMark: m['firstMark'] as String? ?? 'X', // older games: X began
       );
 }
 
