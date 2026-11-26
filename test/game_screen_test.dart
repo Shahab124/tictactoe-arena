@@ -1,3 +1,4 @@
+
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,13 +6,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tictactoe_arena/data/game_store.dart';
 import 'package:tictactoe_arena/game/game_screen.dart';
 
+// Creates a fresh store for tests without using real saved data.
 Future<GameStore> newStore() async {
   SharedPreferences.setMockInitialValues({});
   return GameStore(
       firestore: FakeFirebaseFirestore(),
       prefs: await SharedPreferences.getInstance());
 }
-
+//checked
 Future<GameStore> open(WidgetTester tester, {int size = 3}) async {
   final store = await newStore();
   await tester.pumpWidget(
@@ -78,6 +80,7 @@ void main() {
     expect(find.bySemanticsLabel(RegExp(', [XO]\$')), findsNothing);
   });
 
+  // Verifies the larger board size and its five-in-a-row winning rule.
   testWidgets('8×8 has 64 cells and needs five in a row', (tester) async {
     tester.view.physicalSize = const Size(1200, 1600);
     addTearDown(tester.view.reset);

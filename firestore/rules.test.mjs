@@ -60,7 +60,8 @@ test("usernames are unique and can't be taken or claimed for someone else", asyn
 // Online rooms (SCRUM-29).
 const room = (extra = {}) => ({
   size: 3, winLength: 3, x: 'ayesha', o: null, players: ['ayesha'],
-  moves: [], status: 'waiting', winner: null, reason: null, lastMoveAt: null, ...extra,
+  moves: [], status: 'waiting', winner: null, reason: null, lastMoveAt: null,
+  completedAt: null, ...extra,
 });
 const playing = (extra = {}) =>
   room({ o: 'omar', players: ['ayesha', 'omar'], status: 'playing', lastMoveAt: new Date(), ...extra });
@@ -102,15 +103,36 @@ test('someone not in the game cannot change it or join a full room', async () =>
 test('a player who leaves loses, and cannot hand themselves the win', async () => {
   await seed(playing());
   await assertFails(updateDoc(doc(db('omar'), 'rooms/ABCDE'), { status: 'over', winner: 'O', reason: 'left' }));
-  await assertSucceeds(updateDoc(doc(db('omar'), 'rooms/ABCDE'), { status: 'over', winner: 'X', reason: 'left' }));
+  await assertFails(updateDoc(doc(db('omar'), 'rooms/ABCDE'), {
+    status: 'over', winner: 'X', reason: 'left',
+  }));
+  await assertSucceeds(updateDoc(doc(db('omar'), 'rooms/ABCDE'), {
+    status: 'over', winner: 'X', reason: 'left', completedAt: serverTimestamp(),
+  }));
 });
 
 test('a win on time can be claimed only after 60 seconds', async () => {
-  const claim = () => updateDoc(doc(db('omar'), 'rooms/ABCDE'), { status: 'over', winner: 'O', reason: 'timeout' });
+  const claim = () => updateDoc(doc(db('omar'), 'rooms/ABCDE'), {
+    status: 'over', winner: 'O', reason: 'timeout', completedAt: serverTimestamp(),
+  });
   await seed(playing());                                          // X to move, just started.
   await assertFails(claim());
   await seed(playing({ lastMoveAt: new Date(Date.now() - 61000) }));
   await assertSucceeds(claim());
+});
+
+test('a winning move records its server completion time', async () => {
+  await seed(playing({ moves: [0, 3, 1, 4] }));
+  const win = (completedAt) => updateDoc(doc(db('ayesha'), 'rooms/ABCDE'), {
+    moves: [0, 3, 1, 4, 2],
+    status: 'over',
+    winner: 'X',
+    reason: 'line',
+    lastMoveAt: serverTimestamp(),
+    ...(completedAt ? { completedAt } : {}),
+  });
+  await assertFails(win(null));
+  await assertSucceeds(win(serverTimestamp()));
 });
 
 // Ratings (SCRUM-30).

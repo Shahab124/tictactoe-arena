@@ -36,10 +36,15 @@ service cloud.firestore {
         return d().status == 'waiting' && d().o == null && me() != d().x
           && n().o == me() && n().players == [d().x, me()]
           && n().status == 'playing' && n().moves == d().moves
-          && n().lastMoveAt == request.time;
+          && n().lastMoveAt == request.time && n().completedAt == null;
       }
       function asBefore() {
         return n().o == d().o && n().players == d().players;
+      }
+      function completionTime() {
+        return n().status == 'over'
+          ? n().completedAt == request.time
+          : n().completedAt == d().completedAt;
       }
       // One new move on an empty cell, by the player whose turn it is.
       // ponytail: the win a mover reports isn't re-checked here; the app
@@ -54,11 +59,13 @@ service cloud.firestore {
           && n().moves[d().moves.size()] < d().size * d().size
           && !(n().moves[d().moves.size()] in d().moves)
           && n().lastMoveAt == request.time
+          && completionTime()
           && (n().status == 'playing' || n().status == 'over');
       }
       function ending(winner, reason) {
         return asBefore() && n().moves == d().moves && n().status == 'over'
-          && n().winner == winner && n().reason == reason;
+          && n().winner == winner && n().reason == reason
+          && n().completedAt == request.time;
       }
       function leaving() { return ending(otherMark(), 'left'); }
       function timingOut() {
@@ -71,7 +78,7 @@ service cloud.firestore {
       allow create: if request.auth != null
         && n().x == me() && n().o == null && n().players == [me()]
         && n().status == 'waiting' && n().moves == []
-        && n().size in [3, 8];
+        && n().size in [3, 8] && n().completedAt == null;
       allow update: if request.auth != null && fixed() && (joining()
         || (me() in d().players && d().status == 'playing'
             && (moving() || leaving() || timingOut())));

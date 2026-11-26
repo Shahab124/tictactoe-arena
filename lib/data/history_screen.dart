@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../game/replay_screen.dart';
 import 'game_record.dart';
 import 'game_store.dart';
 
-/// Match history and statistics (REQ-DATA-02 and 03).
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key, required this.store, this.uid});
+/// Match history and statistics (REQ-DATA-02 and 03).
 
   final GameStore store;
 
@@ -44,6 +45,9 @@ class HistoryScreen extends StatelessWidget {
                 ListTile(
                   leading: Text(g.result.toUpperCase()),
                   title: Text('vs ${g.opponent}'),
+                  trailing: const Icon(Icons.slideshow_rounded),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => ReplayScreen(game: g))),
                   subtitle: Text('${g.boardSize}×${g.boardSize}, '
                       '${g.winLength} in a row · '
                       '${MaterialLocalizations.of(context).formatMediumDate(g.playedAt.toLocal())}'),

@@ -6,6 +6,7 @@ import 'package:tictactoe_arena/data/game_record.dart';
 import 'package:tictactoe_arena/data/game_store.dart';
 import 'package:tictactoe_arena/data/history_screen.dart';
 
+// Helper function to create sample game records for testing.
 GameRecord game(String result,
         {int size = 3, String mode = 'computer', int day = 1}) =>
     GameRecord(
@@ -50,7 +51,7 @@ void main() {
     final firestore = FakeFirebaseFirestore();
     final store = await newStore(firestore);
     await store.save(game('draw'));
-
+// Checks that statistics are calculated separately for each game type.
     expect((await store.history()).single.result, 'draw');
     expect(firestore.dump(), isNot(contains('draw')));
   });

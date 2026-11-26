@@ -17,22 +17,24 @@ int eloChange(int mine, int theirs, double score) {
 
 /// ISO week, e.g. '2026-W48', used for the weekly leaderboard.
 String weekKey(DateTime d) {
-  final day = DateTime.utc(d.year, d.month, d.day);
+  final utc = d.toUtc();
+  final day = DateTime.utc(utc.year, utc.month, utc.day);
   final thursday = day.add(Duration(days: 4 - day.weekday));
-  final week = (thursday.difference(DateTime.utc(thursday.year)).inDays ~/ 7) + 1;
+  final week =
+      (thursday.difference(DateTime.utc(thursday.year)).inDays ~/ 7) + 1;
   return '${thursday.year}-W${week.toString().padLeft(2, '0')}';
 }
 
 /// One row of a leaderboard.
 class Rating {
   Rating.fromMap(this.uid, Map<String, dynamic> d)
-      : name = d['name'] as String? ?? 'Player',
-        rating = d['rating'] as int? ?? startRating,
-        games = d['games'] as int? ?? 0,
-        week = d['week'] as String?,
-        weekPoints = d['weekPoints'] as int? ?? 0,
-        lastRoom = d['lastRoom'] as String?,
-        previous = d['previous'] as int?;
+    : name = d['name'] as String? ?? 'Player',
+      rating = d['rating'] as int? ?? startRating,
+      games = d['games'] as int? ?? 0,
+      week = d['week'] as String?,
+      weekPoints = d['weekPoints'] as int? ?? 0,
+      lastRoom = d['lastRoom'] as String?,
+      previous = d['previous'] as int?;
 
   final String uid, name;
   final int rating, games, weekPoints;
@@ -44,7 +46,8 @@ class Rating {
 
   /// This player's rating before [code] was counted, so both players' changes
   /// use the ratings from before the game, whoever records first.
-  int ratingBefore(String code) => lastRoom == code ? previous ?? rating : rating;
+  int ratingBefore(String code) =>
+      lastRoom == code ? previous ?? rating : rating;
 }
 
 /// Ratings and leaderboards, stored at `ratings/<uid>` (REQ-RANK-01, 02).
@@ -65,6 +68,21 @@ class Ratings {
   Future<Rating> of(String uid) async =>
       Rating.fromMap(uid, (await _ratings.doc(uid).get()).data() ?? {});
 
+  Future<DateTime> serverNow(String uid) async {
+    final ref = firestore
+        .collection('users')
+        .doc(uid)
+        .collection('metadata')
+        .doc('server-clock');
+    await ref.set({'now': FieldValue.serverTimestamp()});
+    final snapshot = await ref.get(const GetOptions(source: Source.server));
+    final now = snapshot.data()?['now'];
+    if (now is! Timestamp) {
+      throw StateError('Firestore did not return a server timestamp.');
+    }
+    return now.toDate().toUtc();
+  }
+
   /// Counts the finished [room] for [uid]. Safe to call more than once.
   Future<void> record(Room room, String uid, {DateTime? now}) async {
     final me = room.markOf(uid);
@@ -75,27 +93,37 @@ class Ratings {
       final w when w == me.symbol => 1.0,
       _ => 0.0,
     };
-    final week = weekKey(now ?? DateTime.now());
-    final name = (await firestore.collection('users').doc(uid).get())
-        .data()?['username'] as String?;
+    final timestamp = room.completedAt ?? now ?? await serverNow(uid);
+    final week = weekKey(timestamp);
+    final name =
+        (await firestore.collection('users').doc(uid).get()).data()?['username']
+            as String?;
 
     final mine = _ratings.doc(uid);
     final marker = mine.collection('rated').doc(room.code);
     await firestore.runTransaction((t) async {
       if ((await t.get(marker)).exists) return;
       final old = Rating.fromMap(uid, (await t.get(mine)).data() ?? {});
-      final theirs =
-          Rating.fromMap(opponent, (await t.get(_ratings.doc(opponent))).data() ?? {});
+      final theirs = Rating.fromMap(
+        opponent,
+        (await t.get(_ratings.doc(opponent))).data() ?? {},
+      );
       t.set(marker, {'at': FieldValue.serverTimestamp()});
       t.set(mine, {
         'name': name ?? old.name,
-        'rating': old.rating +
+        'rating':
+            old.rating +
             eloChange(old.rating, theirs.ratingBefore(room.code), score),
         'previous': old.rating,
         'games': old.games + 1,
         'week': week,
-        'weekPoints': (old.week == week ? old.weekPoints : 0) +
-            (score == 1 ? 3 : score == 0.5 ? 1 : 0),
+        'weekPoints':
+            (old.week == week ? old.weekPoints : 0) +
+            (score == 1
+                ? 3
+                : score == 0.5
+                ? 1
+                : 0),
         'lastRoom': room.code,
       });
     });
@@ -103,24 +131,28 @@ class Ratings {
 
   /// Highest ratings of all time.
   Future<List<Rating>> global({int limit = 20}) async => [
-        for (final d in (await _ratings
+    for (final d
+        in (await _ratings
                 .orderBy('rating', descending: true)
                 .limit(limit)
                 .get())
             .docs)
-          Rating.fromMap(d.id, d.data())
-      ];
+      Rating.fromMap(d.id, d.data()),
+  ];
 
   /// Most points this week: 3 for a win, 1 for a draw.
   // ponytail: sorted on the device to avoid a composite index; fine for a
   // class-sized player base, add an index past a few thousand players.
-  Future<List<Rating>> weekly({DateTime? now, int limit = 20}) async {
+  Future<List<Rating>> weekly({
+    required String uid,
+    DateTime? now,
+    int limit = 20,
+  }) async {
+    final week = weekKey(now ?? await serverNow(uid));
     final rows = [
-      for (final d in (await _ratings
-              .where('week', isEqualTo: weekKey(now ?? DateTime.now()))
-              .get())
-          .docs)
-        Rating.fromMap(d.id, d.data())
+      for (final d
+          in (await _ratings.where('week', isEqualTo: week).get()).docs)
+        Rating.fromMap(d.id, d.data()),
     ]..sort((a, b) => b.weekPoints.compareTo(a.weekPoints));
     return rows.take(limit).toList();
   }

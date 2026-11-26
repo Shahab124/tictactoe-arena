@@ -4,7 +4,7 @@ import 'package:game_ai/game_ai.dart';
 import 'package:test/test.dart';
 
 List<List<String>> empty(int n) => List.generate(n, (_) => List.filled(n, ''));
-
+//Add avaibility on X's strategy in replay_test
 Map<String, dynamic> req(List<List<String>> board,
         {Object? winLength, Object side = 'X', Object? difficulty = 'easy'}) =>
     {

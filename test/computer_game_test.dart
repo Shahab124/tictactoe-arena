@@ -1,3 +1,4 @@
+
 import 'dart:async';
 
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
@@ -9,6 +10,7 @@ import 'package:tictactoe_arena/game/ai_client.dart';
 import 'package:tictactoe_arena/game/game_screen.dart';
 import 'package:tictactoe_arena/game/setup_screen.dart';
 
+// Creates a fresh test store so each test starts with separate data.
 Future<GameStore> newStore() async {
   SharedPreferences.setMockInitialValues({});
   return GameStore(
@@ -122,6 +124,7 @@ void main() {
     expect(find.text(failed), findsOneWidget);
   });
 
+  // Checks that the game handles an AI response that takes too long.
   testWidgets('no answer within the time limit is cancelled', (tester) async {
     await open(tester, ai: (_) => Completer<Map<String, Object>>().future);
     await tester.tap(cell(1, 1));

@@ -45,6 +45,64 @@ Map<String, Object> requestMove(Map<String, dynamic> request, {Random? random}) 
   return {'row': row, 'col': col};
 }
 
+/// Finds the best and worst move of a finished game for the replay
+/// (REQ-AI-11). [moves] are (row, col) in order, first mover first.
+///
+/// Each move is compared with every other cell the player could have taken:
+/// the best move is the one rated highest, the worst is the one that lost the
+/// most compared with the AI's own choice. [worst] is null when no move was
+/// a mistake.
+({int best, int? worst}) bestAndWorstMoves(List<(int, int)> moves,
+    {required int size, required int winLength}) {
+  final cells = List.generate(size, (_) => List.filled(size, ''));
+  var best = 0, bestScore = double.negativeInfinity;
+  int? worst;
+  var worstLoss = 0.0;
+  for (var i = 0; i < moves.length; i++) {
+    final me = i.isEven ? 'X' : 'O';
+    final threat = size == 3 ? null : _winningMove(cells, _other(me), winLength);
+    double rate((int, int) cell) => size == 3
+        ? _rate3x3(cells, cell, me)
+        : _rate8x8(cells, cell, me, winLength, threat);
+    final played = rate(moves[i]);
+    final top = _empty(cells).map(rate).reduce(max);
+    if (played > bestScore) {
+      bestScore = played;
+      best = i;
+    }
+    if (top - played > worstLoss) {
+      worstLoss = top - played;
+      worst = i;
+    }
+    cells[moves[i].$1][moves[i].$2] = me;
+  }
+  return (best: best, worst: worst);
+}
+
+// Exact on 3×3: the result with perfect play after this move.
+double _rate3x3(List<List<String>> cells, (int, int) cell, String me) {
+  final (r, c) = cell;
+  cells[r][c] = me;
+  final score = -_negamax(cells, _other(me), 1, -1000, 1000);
+  cells[r][c] = '';
+  return score.toDouble();
+}
+
+// 8×8: winning is best, leaving the opponent's win open is worst, otherwise
+// the same line score Expert uses.
+// ponytail: only checks one opponent threat; with two, every move loses anyway.
+double _rate8x8(List<List<String>> cells, (int, int) cell, String me, int win,
+    (int, int)? threat) {
+  final (r, c) = cell;
+  cells[r][c] = me;
+  final wins = _hasLine(cells, win);
+  cells[r][c] = '';
+  if (wins) return 1e6;
+  if (threat != null && threat != cell) return -1e6;
+  return 1.1 * _lineScore(cells, r, c, me, win) +
+      _lineScore(cells, r, c, _other(me), win);
+}
+
 // Easy: any empty cell at random, so a beginner can win (REQ-AI-02).
 (int, int) _easy(List<List<String>> cells, Random random) {
   final empty = _empty(cells);
@@ -158,7 +216,8 @@ double _lineScore(List<List<String>> cells, int r, int c, String mark, int win) 
   }
   return total;
 }
-
+// Score for [toMove] with perfect play; faster wins and slower losses score
+// higher, so Hard wins as soon as it can.
 String _other(String mark) => mark == 'X' ? 'O' : 'X';
 
 Map<String, Object>? _validate(
