@@ -21,23 +21,47 @@ class AppSettings extends ChangeNotifier {
       : _theme = ThemeMode.values[_prefs?.getInt('theme') ?? 0],
         _skin = Skin.values[_prefs?.getInt('skin') ?? 0],
         _sound = _prefs?.getBool('sound') ?? true,
-        _vibration = _prefs?.getBool('vibration') ?? true;
+        _vibration = _prefs?.getBool('vibration') ?? true,
+        _urdu = _prefs?.getBool('urdu') ?? false,
+        _colourBlind = _prefs?.getBool('colourBlind') ?? false,
+        // Shown once on a real first launch; never in tests without prefs.
+        _tutorialSeen =
+            _prefs == null || (_prefs.getBool('tutorialSeen') ?? false);
 
   final SharedPreferences? _prefs;
   ThemeMode _theme;
   Skin _skin;
-  bool _sound, _vibration;
+  bool _sound, _vibration, _urdu, _colourBlind, _tutorialSeen;
 
   ThemeMode get themeMode => _theme;
   Skin get skin => _skin;
   bool get sound => _sound;
   bool get vibration => _vibration;
 
-  set themeMode(ThemeMode v) => _set(() => _theme = v, () => _prefs?.setInt('theme', v.index));
-  set skin(Skin v) => _set(() => _skin = v, () => _prefs?.setInt('skin', v.index));
-  set sound(bool v) => _set(() => _sound = v, () => _prefs?.setBool('sound', v));
+  /// Urdu instead of English (REQ-UX-06).
+  bool get urdu => _urdu;
+
+  /// Okabe-Ito blue and orange, which colour-blind players can tell apart,
+  /// instead of the skin's colours (REQ-UX-07). X and O also differ by shape.
+  bool get colourBlind => _colourBlind;
+  bool get tutorialSeen => _tutorialSeen;
+
+  Color get xColor => _colourBlind ? const Color(0xFF0072B2) : _skin.x;
+  Color get oColor => _colourBlind ? const Color(0xFFE69F00) : _skin.o;
+
+  set themeMode(ThemeMode v) =>
+      _set(() => _theme = v, () => _prefs?.setInt('theme', v.index));
+  set skin(Skin v) =>
+      _set(() => _skin = v, () => _prefs?.setInt('skin', v.index));
+  set sound(bool v) =>
+      _set(() => _sound = v, () => _prefs?.setBool('sound', v));
   set vibration(bool v) =>
       _set(() => _vibration = v, () => _prefs?.setBool('vibration', v));
+  set urdu(bool v) => _set(() => _urdu = v, () => _prefs?.setBool('urdu', v));
+  set colourBlind(bool v) =>
+      _set(() => _colourBlind = v, () => _prefs?.setBool('colourBlind', v));
+  set tutorialSeen(bool v) =>
+      _set(() => _tutorialSeen = v, () => _prefs?.setBool('tutorialSeen', v));
 
   void _set(void Function() change, void Function() save) {
     change();
@@ -58,7 +82,9 @@ class AppSettings extends ChangeNotifier {
 
   /// The app's settings, or defaults when a screen is shown on its own.
   static AppSettings of(BuildContext context) =>
-      context.dependOnInheritedWidgetOfExactType<AppSettingsScope>()?.notifier ??
+      context
+          .dependOnInheritedWidgetOfExactType<AppSettingsScope>()
+          ?.notifier ??
       _fallback;
 }
 

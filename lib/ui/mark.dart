@@ -17,8 +17,8 @@ class MarkView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final skin = AppSettings.of(context).skin;
-    final paint = color ?? (mark == Mark.x ? skin.x : skin.o);
+    final s = AppSettings.of(context);
+    final paint = color ?? (mark == Mark.x ? s.xColor : s.oColor);
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
       duration: motion(context, 320),
@@ -47,7 +47,9 @@ class _MarkPainter extends CustomPainter {
     final stroke = s * 0.12;
     final inset = s * 0.22;
     final rect = Rect.fromCenter(
-        center: size.center(Offset.zero), width: s - inset * 2, height: s - inset * 2);
+        center: size.center(Offset.zero),
+        width: s - inset * 2,
+        height: s - inset * 2);
     final paint = Paint()
       ..color = color
       ..strokeWidth = stroke
@@ -61,9 +63,11 @@ class _MarkPainter extends CustomPainter {
     // X: first stroke, then second.
     final a = (progress * 2).clamp(0.0, 1.0);
     final b = (progress * 2 - 1).clamp(0.0, 1.0);
-    canvas.drawLine(rect.topLeft, Offset.lerp(rect.topLeft, rect.bottomRight, a)!, paint);
+    canvas.drawLine(
+        rect.topLeft, Offset.lerp(rect.topLeft, rect.bottomRight, a)!, paint);
     if (b > 0) {
-      canvas.drawLine(rect.topRight, Offset.lerp(rect.topRight, rect.bottomLeft, b)!, paint);
+      canvas.drawLine(rect.topRight,
+          Offset.lerp(rect.topRight, rect.bottomLeft, b)!, paint);
     }
   }
 

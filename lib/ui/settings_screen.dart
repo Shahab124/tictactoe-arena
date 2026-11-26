@@ -3,6 +3,8 @@ import 'package:game_engine/game_engine.dart';
 
 import 'app_settings.dart';
 import 'mark.dart';
+import 'tutorial_screen.dart';
+import 'strings.dart';
 
 /// Theme, skin, sound and vibration (REQ-UX-04, 05).
 class SettingsScreen extends StatelessWidget {
@@ -13,26 +15,30 @@ class SettingsScreen extends StatelessWidget {
     final s = AppSettings.of(context);
     final heading = Theme.of(context).textTheme.titleMedium;
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(context.tr('Settings'))),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              Text('Theme', style: heading),
+              Text(context.tr('Theme'), style: heading),
               const SizedBox(height: 8),
               SegmentedButton<ThemeMode>(
-                segments: const [
-                  ButtonSegment(value: ThemeMode.system, label: Text('System')),
-                  ButtonSegment(value: ThemeMode.light, label: Text('Light')),
-                  ButtonSegment(value: ThemeMode.dark, label: Text('Dark')),
+                segments: [
+                  ButtonSegment(
+                      value: ThemeMode.system,
+                      label: Text(context.tr('System'))),
+                  ButtonSegment(
+                      value: ThemeMode.light, label: Text(context.tr('Light'))),
+                  ButtonSegment(
+                      value: ThemeMode.dark, label: Text(context.tr('Dark'))),
                 ],
                 selected: {s.themeMode},
                 onSelectionChanged: (v) => s.themeMode = v.first,
               ),
               const SizedBox(height: 24),
-              Text('Skin', style: heading),
+              Text(context.tr('Skin'), style: heading),
               const SizedBox(height: 8),
               Wrap(spacing: 12, runSpacing: 12, children: [
                 for (final skin in Skin.values)
@@ -49,17 +55,47 @@ class SettingsScreen extends StatelessWidget {
               const SizedBox(height: 24),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Sound'),
-                subtitle: const Text('A click when a mark is placed'),
+                title: Text(context.tr('Sound')),
+                subtitle: Text(context.tr('A click when a mark is placed')),
                 value: s.sound,
                 onChanged: (v) => s.sound = v,
               ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Vibration'),
-                subtitle: const Text('A short buzz on phones that support it'),
+                title: Text(context.tr('Vibration')),
+                subtitle:
+                    Text(context.tr('A short buzz on phones that support it')),
                 value: s.vibration,
                 onChanged: (v) => s.vibration = v,
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(context.tr('Colour-blind friendly colours')),
+                subtitle: Text(context.tr(
+                    'Blue and orange, which almost everyone can tell apart')),
+                value: s.colourBlind,
+                onChanged: (v) => s.colourBlind = v,
+              ),
+              const SizedBox(height: 16),
+              Text(context.tr('Language'), style: heading),
+              const SizedBox(height: 8),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: false, label: Text('English')),
+                  ButtonSegment(value: true, label: Text('اردو')),
+                ],
+                selected: {s.urdu},
+                onSelectionChanged: (v) => s.urdu = v.first,
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.school_outlined),
+                title: Text(context.tr('How to play')),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (context) => TutorialScreen(
+                        onDone: () => Navigator.of(context).pop()))),
               ),
             ],
           ),
@@ -76,6 +112,5 @@ class AppSettingsPreview extends StatelessWidget {
   final Skin skin;
 
   @override
-  Widget build(BuildContext context) =>
-      MarkView(mark: Mark.x, color: skin.x);
+  Widget build(BuildContext context) => MarkView(mark: Mark.x, color: skin.x);
 }

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../ui/mark.dart';
+import '../ui/strings.dart';
 
 /// Sign up, sign in, Google sign-in, password reset and guest play
 /// (REQ-ACC-01, 02 and 06). Passwords are handled only by Firebase
@@ -96,21 +97,22 @@ class _SignInScreenState extends State<SignInScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Classic 3×3 or the big 8×8 board.',
+                    context.tr('Classic 3×3 or the big 8×8 board.'),
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                   const SizedBox(height: 28),
                   TextField(
                     controller: _email,
-                    decoration: const InputDecoration(labelText: 'Email'),
+                    decoration: InputDecoration(labelText: context.tr('Email')),
                     keyboardType: TextInputType.emailAddress,
                     autofillHints: const [AutofillHints.email],
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _password,
-                    decoration: const InputDecoration(labelText: 'Password'),
+                    decoration:
+                        InputDecoration(labelText: context.tr('Password')),
                     obscureText: true,
                     autofillHints: const [AutofillHints.password],
                   ),
@@ -122,30 +124,30 @@ class _SignInScreenState extends State<SignInScreen> {
                     ),
                   FilledButton(
                     onPressed: _busy ? null : _signIn,
-                    child: const Text('Sign in'),
+                    child: Text(context.tr('Sign in')),
                   ),
                   const SizedBox(height: 10),
                   OutlinedButton(
                     onPressed: _busy ? null : _signUp,
-                    child: const Text('Create account'),
+                    child: Text(context.tr('Create account')),
                   ),
                   if (_googleSupported) ...[
                     const SizedBox(height: 10),
                     OutlinedButton.icon(
                       onPressed: _busy ? null : _google,
                       icon: const Icon(Icons.g_mobiledata, size: 28),
-                      label: const Text('Continue with Google'),
+                      label: Text(context.tr('Continue with Google')),
                     ),
                   ],
                   TextButton(
                     onPressed: _busy ? null : _reset,
-                    child: const Text('Forgot password?'),
+                    child: Text(context.tr('Forgot password?')),
                   ),
                   const Divider(height: 24),
                   TextButton.icon(
                     onPressed: _busy ? null : widget.onGuest,
                     icon: const Icon(Icons.sports_esports_outlined),
-                    label: const Text('Play as guest'),
+                    label: Text(context.tr('Play as guest')),
                   ),
                 ],
               ),
