@@ -48,6 +48,7 @@ class _MarkPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     if (mark == Mark.o) {
+      // Starting at the top makes the circle draw clockwise from 12 o'clock.
       canvas.drawArc(rect, -pi / 2, 2 * pi * progress, false, paint);
       return;
     }

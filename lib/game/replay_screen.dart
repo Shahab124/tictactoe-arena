@@ -24,6 +24,7 @@ class _ReplayScreenState extends State<ReplayScreen> {
   int get _total => widget.game.moves.length;
 
   // The board after the first [_step] moves.
+  // Rebuilding from the move history keeps stepping backward and forward deterministic.
   Game get _board {
     final g = widget.game;
     final game = Game(

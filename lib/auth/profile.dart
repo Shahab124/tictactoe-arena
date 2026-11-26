@@ -41,6 +41,7 @@ class Profiles {
       throw const UsernameException(
           'Use 3 to 15 letters, numbers or underscores.');
     }
+    // Claiming the new name and releasing the old one together avoids a partial rename.
     await firestore.runTransaction((t) async {
       final taken = await t.get(_name(name));
       if (taken.exists && taken.data()!['uid'] != uid) {
