@@ -3,16 +3,22 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:game_engine/game_engine.dart';
 
+import 'app_settings.dart';
 import 'theme.dart';
 
 /// Draws an X or an O that strokes itself in when it first appears.
 class MarkView extends StatelessWidget {
-  const MarkView({super.key, required this.mark});
+  const MarkView({super.key, required this.mark, this.color});
 
   final Mark mark;
 
+  /// Defaults to the colour of [mark] in the player's chosen skin.
+  final Color? color;
+
   @override
   Widget build(BuildContext context) {
+    final skin = AppSettings.of(context).skin;
+    final paint = color ?? (mark == Mark.x ? skin.x : skin.o);
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
       duration: motion(context, 320),
@@ -20,7 +26,7 @@ class MarkView extends StatelessWidget {
       builder: (context, t, _) => Transform.scale(
         scale: 0.6 + 0.4 * Curves.easeOutBack.transform(t),
         child: CustomPaint(
-          painter: _MarkPainter(mark, t),
+          painter: _MarkPainter(mark, t, paint),
           size: Size.infinite,
         ),
       ),
@@ -29,10 +35,11 @@ class MarkView extends StatelessWidget {
 }
 
 class _MarkPainter extends CustomPainter {
-  _MarkPainter(this.mark, this.progress);
+  _MarkPainter(this.mark, this.progress, this.color);
 
   final Mark mark;
   final double progress;
+  final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -42,7 +49,7 @@ class _MarkPainter extends CustomPainter {
     final rect = Rect.fromCenter(
         center: size.center(Offset.zero), width: s - inset * 2, height: s - inset * 2);
     final paint = Paint()
-      ..color = mark == Mark.x ? ArenaColors.x : ArenaColors.o
+      ..color = color
       ..strokeWidth = stroke
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
@@ -62,7 +69,7 @@ class _MarkPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_MarkPainter old) =>
-      old.progress != progress || old.mark != mark;
+      old.progress != progress || old.mark != mark || old.color != color;
 }
 
 /// The app's logo: a small 3×3 board with a winning diagonal.

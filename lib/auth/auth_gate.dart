@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../data/game_store.dart';
 import '../data/history_screen.dart';
 import '../game/setup_screen.dart';
+import '../ui/settings_screen.dart';
 import '../ui/theme.dart';
 import 'profile.dart';
 import 'sign_in_screen.dart';
@@ -123,6 +124,11 @@ class HomeScreen extends StatelessWidget {
         title: const Text('TicTacToe Arena',
             style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
+          IconButton(
+              onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsScreen())),
+              tooltip: 'Settings',
+              icon: const Icon(Icons.settings_outlined)),
           if (onProfile != null)
             IconButton(
                 onPressed: onProfile,

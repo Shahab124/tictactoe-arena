@@ -3,6 +3,7 @@ import 'package:game_engine/game_engine.dart';
 
 import '../data/game_record.dart';
 import '../data/game_store.dart';
+import '../ui/app_settings.dart';
 import '../ui/mark.dart';
 import '../ui/theme.dart';
 import 'ai_client.dart';
@@ -131,6 +132,7 @@ class _GameScreenState extends State<GameScreen> {
     }
     if (result != MoveResult.ok) return; // game over: ignore (D3 REQ-PLAT 6.1)
     setState(() => _hint = null);
+    AppSettings.of(context).feedback(gameOver: _game.isOver);
     _persist();
     if (_game.isOver) {
       _finish();
@@ -170,6 +172,7 @@ class _GameScreenState extends State<GameScreen> {
       _thinking = false;
       _aiFailed = !played;
     });
+    if (played) AppSettings.of(context).feedback(gameOver: game.isOver);
     _persist();
     if (game.isOver) _finish();
   }
@@ -591,7 +594,8 @@ class _PlayerChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = mark == Mark.x ? ArenaColors.x : ArenaColors.o;
+    final skin = AppSettings.of(context).skin;
+    final color = mark == Mark.x ? skin.x : skin.o;
     return ExcludeSemantics(
       child: AnimatedContainer(
         duration: motion(context, 250),
