@@ -17,7 +17,7 @@ Future<GameStore> newStore(FakeFirebaseFirestore firestore) async {
   return GameStore(
       firestore: firestore, prefs: await SharedPreferences.getInstance());
 }
-
+// Collects saved game results for a specific user from Firestore.
 Future<List<String>> results(FakeFirebaseFirestore db, String uid) async => [
       for (final d in (await db.collection('users/$uid/games').get()).docs)
         d.data()['result'] as String
@@ -37,7 +37,7 @@ void main() {
     expect(await results(db, 'ayesha'), unorderedEquals(['win', 'draw']));
     expect(await store.history(), isEmpty);
   });
-
+// Tests username uniqueness, validation rules, and username updates.
   testWidgets('a guest who signs up keeps their games', (tester) async {
     final db = FakeFirebaseFirestore();
     final store = await newStore(db);

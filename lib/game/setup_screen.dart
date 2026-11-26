@@ -152,13 +152,18 @@ class _SetupScreenState extends State<SetupScreen> {
                   ),
                   const SizedBox(height: 8),
                   if (_size == 8) ...[
-                    _choice([(4, '4 in a row'), (5, '5 in a row')], _winLength,
+                    _choice(
+                        [
+                          (4, context.tr('4 in a row')),
+                          (5, context.tr('5 in a row')),
+                        ],
+                        _winLength,
                         (v) => _winLength = v),
                     const SizedBox(height: 8),
                   ],
-                  Text(_size == 3
+                  Text(context.tr(_size == 3
                       ? 'Three in a row wins.'
-                      : '${_winLength == 4 ? 'Four' : 'Five'} in a row wins. Pinch the board to zoom.'),
+                      : '${_winLength == 4 ? 'Four' : 'Five'} in a row wins. Pinch the board to zoom.')),
                   const SizedBox(height: 24),
                   Text(context.tr('Mode'), style: label),
                   const SizedBox(height: 8),

@@ -7,6 +7,8 @@ import '../data/game_store.dart';
 import '../data/history_screen.dart';
 import '../game/setup_screen.dart';
 import '../ui/settings_screen.dart';
+import '../online/online_rooms.dart';
+import '../online/online_screen.dart';
 import '../ui/theme.dart';
 import 'profile.dart';
 import 'sign_in_screen.dart';
@@ -76,6 +78,13 @@ class _AuthGateState extends State<AuthGate> {
           onHistory: () => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) =>
                   HistoryScreen(store: widget.store, uid: user?.uid))),
+          // Online play needs an account, so guests don't see it (REQ-MODE-03).
+          onOnline: user == null
+              ? null
+              : () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => OnlineLobby(
+                      rooms: OnlineRooms(widget.store.firestore),
+                      uid: user.uid))),
           onPlay: (size) => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => SetupScreen(
                   initialSize: size, store: widget.store, uid: user?.uid))),
@@ -95,6 +104,7 @@ class HomeScreen extends StatelessWidget {
     required this.onSignOut,
     required this.onHistory,
     required this.onPlay,
+    this.onOnline,
   });
 
   final String name, signOutLabel;
@@ -102,6 +112,7 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onSignOut;
   final VoidCallback onHistory;
   final void Function(int size) onPlay;
+  final VoidCallback? onOnline;
 
   @override
   Widget build(BuildContext context) {
@@ -192,6 +203,25 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (onOnline != null) ...[
+                  const SizedBox(height: 12),
+                  _Reveal(
+                    order: 4,
+                    child: Card(
+                      clipBehavior: Clip.antiAlias,
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 8),
+                        leading: const Icon(Icons.public_rounded, size: 32),
+                        title: const Text('Play online',
+                            style: TextStyle(fontWeight: FontWeight.w700)),
+                        subtitle: const Text('Create or join a room with a code'),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: onOnline,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

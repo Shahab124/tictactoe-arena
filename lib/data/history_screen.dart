@@ -5,9 +5,9 @@ import 'game_record.dart';
 import 'game_store.dart';
 import '../ui/strings.dart';
 
-/// Match history and statistics (REQ-DATA-02 and 03).
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key, required this.store, this.uid});
+/// Match history and statistics (REQ-DATA-02 and 03).
 
   final GameStore store;
 

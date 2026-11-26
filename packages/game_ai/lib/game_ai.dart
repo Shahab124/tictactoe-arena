@@ -216,7 +216,8 @@ double _lineScore(List<List<String>> cells, int r, int c, String mark, int win) 
   }
   return total;
 }
-
+// Score for [toMove] with perfect play; faster wins and slower losses score
+// higher, so Hard wins as soon as it can.
 String _other(String mark) => mark == 'X' ? 'O' : 'X';
 
 Map<String, Object>? _validate(

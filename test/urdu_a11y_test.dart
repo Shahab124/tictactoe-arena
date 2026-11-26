@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tictactoe_arena/data/game_store.dart';
 import 'package:tictactoe_arena/game/game_screen.dart';
+import 'package:tictactoe_arena/game/setup_screen.dart';
 import 'package:tictactoe_arena/main.dart';
 import 'package:tictactoe_arena/ui/app_settings.dart';
 import 'package:tictactoe_arena/ui/settings_screen.dart';
@@ -52,6 +53,34 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.text('X کی باری'), findsOneWidget);
+  });
+
+  testWidgets('setup win rules and 8×8 options are translated to Urdu',
+      (tester) async {
+    final settings = AppSettings()..urdu = true;
+    await tester.pumpWidget(AppSettingsScope(
+      settings: settings,
+      child: MaterialApp(home: SetupScreen(store: await store())),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('لگاتار تین نشان جیت دلاتے ہیں۔'), findsOneWidget);
+
+    await tester.tap(find.text('بڑا 8×8'));
+    await tester.pump();
+    expect(
+      find.text('لگاتار پانچ نشان جیت دلاتے ہیں۔ بورڈ بڑا کرنے کے لیے چٹکی لیں۔'),
+      findsOneWidget,
+    );
+    expect(find.text('لگاتار پانچ'), findsOneWidget);
+
+    await tester.tap(find.text('لگاتار چار'));
+    await tester.pump();
+    expect(
+      find.text('لگاتار چار نشان جیت دلاتے ہیں۔ بورڈ بڑا کرنے کے لیے چٹکی لیں۔'),
+      findsOneWidget,
+    );
+    expect(find.text('4 in a row'), findsNothing);
+    expect(find.text('5 in a row'), findsNothing);
   });
 
   test('colour-blind mode swaps to blue and orange for every skin', () {

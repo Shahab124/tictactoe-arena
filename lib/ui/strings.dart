@@ -70,6 +70,13 @@ const _ur = {
   'Mode': 'طریقہ',
   'Two players': 'دو کھلاڑی',
   'Computer': 'کمپیوٹر',
+  '4 in a row': 'لگاتار چار',
+  '5 in a row': 'لگاتار پانچ',
+  'Three in a row wins.': 'لگاتار تین نشان جیت دلاتے ہیں۔',
+  'Four in a row wins. Pinch the board to zoom.':
+      'لگاتار چار نشان جیت دلاتے ہیں۔ بورڈ بڑا کرنے کے لیے چٹکی لیں۔',
+  'Five in a row wins. Pinch the board to zoom.':
+      'لگاتار پانچ نشان جیت دلاتے ہیں۔ بورڈ بڑا کرنے کے لیے چٹکی لیں۔',
   'Difficulty': 'مشکل',
   'Easy': 'آسان',
   'Medium': 'درمیانہ',
