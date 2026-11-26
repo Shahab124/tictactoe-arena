@@ -11,7 +11,7 @@ Future<GameStore> newStore() async {
       firestore: FakeFirebaseFirestore(),
       prefs: await SharedPreferences.getInstance());
 }
-
+//checked
 Future<GameStore> open(WidgetTester tester, {int size = 3}) async {
   final store = await newStore();
   await tester.pumpWidget(
