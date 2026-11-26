@@ -11,6 +11,7 @@ void main() {
     expect(r.worst, 3);
     expect(r.best, 4);
   });
+    // X takes the top row because O played (2,2) instead of blocking (0,2).
 
   test('3×3: a game of perfect moves has no worst move', () {
     final board = List.generate(3, (_) => List.filled(3, ''));
