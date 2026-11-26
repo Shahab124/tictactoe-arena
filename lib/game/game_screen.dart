@@ -6,6 +6,7 @@ import '../data/game_store.dart';
 import '../ui/mark.dart';
 import '../ui/theme.dart';
 import 'ai_client.dart';
+import 'replay_screen.dart';
 
 /// A game on one device: two local players (REQ-MODE-02), or the player as X
 /// against the computer as O when [difficulty] is set (REQ-MODE-01). Shows
@@ -56,6 +57,10 @@ class _GameScreenState extends State<GameScreen> {
   late Game _game = _newGame();
   bool _thinking = false;
   bool _aiFailed = false;
+
+  /// The cell the Hint button suggests, until the next move (REQ-AI-09).
+  (int, int)? _hint;
+  GameRecord? _record; // the finished game, for Replay
   final _wins = {Mark.x: 0, Mark.o: 0};
 
   bool get _vsComputer => widget.difficulty != null;
@@ -89,7 +94,7 @@ class _GameScreenState extends State<GameScreen> {
       return;
     }
     if (result != MoveResult.ok) return; // game over: ignore (D3 REQ-PLAT 6.1)
-    setState(() {});
+    setState(() => _hint = null);
     if (_game.isOver) {
       _finish();
     } else if (_vsComputer) {
@@ -131,6 +136,26 @@ class _GameScreenState extends State<GameScreen> {
     if (game.isOver) _finish();
   }
 
+  // Asks the AI, at its strongest, what it would play for the side to move.
+  Future<void> _showHint() async {
+    final game = _game;
+    final reply = await widget.ai({
+      'board': game.toBoard(),
+      'winLength': game.winLength,
+      'sideToMove': game.sideToMove.symbol,
+      'difficulty': 'expert',
+    });
+    final row = reply['row'], col = reply['col'];
+    if (!mounted || game != _game || row is! int || col is! int) return;
+    setState(() => _hint = (row, col));
+  }
+
+  bool get _canHint =>
+      !_thinking &&
+      !_aiFailed &&
+      !_game.isOver &&
+      (!_vsComputer || _game.sideToMove == widget.playerMark);
+
   void _finish() {
     _save();
     final winner = switch (_game.status) {
@@ -138,7 +163,9 @@ class _GameScreenState extends State<GameScreen> {
       GameStatus.oWon => Mark.o,
       _ => null,
     };
-    if (winner != null) setState(() => _wins[winner] = _wins[winner]! + 1);
+    setState(() {
+      if (winner != null) _wins[winner] = _wins[winner]! + 1;
+    });
   }
 
   // Rematch, Restart, Next game or New match.
@@ -148,6 +175,7 @@ class _GameScreenState extends State<GameScreen> {
       _game = _newGame();
       _thinking = false;
       _aiFailed = false;
+      _hint = null;
     });
     if (_vsComputer && widget.firstToMove == _aiMark) _computerTurn();
   }
@@ -164,6 +192,7 @@ class _GameScreenState extends State<GameScreen> {
         if (_game.sideToMove == widget.playerMark) _game.undo();
         _game.undo();
         _aiFailed = false;
+        _hint = null;
       });
 
   String get _opponent {
@@ -175,8 +204,7 @@ class _GameScreenState extends State<GameScreen> {
   // game the signed-in player is X.
   void _save() {
     final me = _vsComputer ? widget.playerMark : Mark.x;
-    widget.store.save(
-      GameRecord(
+    _record = GameRecord(
         boardSize: _game.size,
         winLength: _game.winLength,
         mode: _vsComputer ? 'computer' : 'local',
@@ -188,9 +216,9 @@ class _GameScreenState extends State<GameScreen> {
           _ => me == Mark.o ? 'win' : 'loss',
         },
         playedAt: DateTime.now(),
-      ),
-      uid: widget.uid,
+        firstMark: _game.firstToMove.symbol,
     );
+    widget.store.save(_record!, uid: widget.uid);
   }
 
   String _name(Mark m) => !_vsComputer
@@ -279,6 +307,7 @@ class _GameScreenState extends State<GameScreen> {
                   col: c,
                   highlighted: winning.contains((r, c)),
                   lastMove: last == (r, c),
+                  hinted: _hint == (r, c),
                   radius: widget.size == 3 ? 14 : 6,
                   colors: colors,
                   onTap: () => _tap(r, c),
@@ -324,6 +353,20 @@ class _GameScreenState extends State<GameScreen> {
             spacing: 12,
             runSpacing: 8,
             children: [
+                if (!_game.isOver)
+                  OutlinedButton.icon(
+                    onPressed: _canHint ? _showHint : null,
+                    icon: const Icon(Icons.lightbulb_outline_rounded),
+                    label: const Text('Hint'),
+                  ),
+                if (_game.isOver && _record != null)
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => ReplayScreen(game: _record!))),
+                    icon: const Icon(Icons.slideshow_rounded),
+                    label: const Text('Replay'),
+                  ),
                 if (_vsComputer)
                   OutlinedButton.icon(
                     onPressed: _canUndo ? _undo : null,
@@ -405,6 +448,7 @@ class _Cell extends StatelessWidget {
     required this.col,
     required this.highlighted,
     required this.lastMove,
+    required this.hinted,
     required this.radius,
     required this.colors,
     required this.onTap,
@@ -416,6 +460,9 @@ class _Cell extends StatelessWidget {
 
   /// Marked with a ring so the player sees the latest move (REQ-PLAT-12).
   final bool lastMove;
+
+  /// Suggested by the Hint button.
+  final bool hinted;
   final double radius;
   final ColorScheme colors;
   final VoidCallback onTap;
@@ -428,7 +475,11 @@ class _Cell extends StatelessWidget {
     return Semantics(
       button: true,
       label: 'Row ${row + 1}, column ${col + 1}, ${mark?.symbol ?? 'empty'}',
-      value: lastMove ? 'last move' : null,
+      value: hinted
+          ? 'hint'
+          : lastMove
+              ? 'last move'
+              : null,
       excludeSemantics: true,
       child: AnimatedContainer(
         duration: motion(context, 350),
@@ -438,8 +489,10 @@ class _Cell extends StatelessWidget {
           color: highlighted
               ? ArenaColors.win.withValues(alpha: 0.45)
               : colors.surfaceContainerHighest,
-          border: lastMove
-              ? Border.all(color: colors.primary, width: radius > 10 ? 3 : 2)
+          border: hinted || lastMove
+              ? Border.all(
+                  color: hinted ? Colors.green : colors.primary,
+                  width: radius > 10 ? 3 : 2)
               : null,
           boxShadow: highlighted
               ? [
