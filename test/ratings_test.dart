@@ -37,10 +37,10 @@ void main() {
   });
 
   test('week keys follow ISO weeks', () {
-    expect(weekKey(DateTime(2026, 11, 23)), '2026-W48');
-    expect(weekKey(DateTime(2026, 11, 29)), '2026-W48');
-    expect(weekKey(DateTime(2026, 11, 30)), '2026-W49');
-    expect(weekKey(DateTime(2027, 1, 1)), '2026-W53');
+    expect(weekKey(DateTime.utc(2026, 11, 23)), '2026-W48');
+    expect(weekKey(DateTime.utc(2026, 11, 29)), '2026-W48');
+    expect(weekKey(DateTime.utc(2026, 11, 30)), '2026-W49');
+    expect(weekKey(DateTime.utc(2027, 1, 1)), '2026-W53');
   });
 
   test(
