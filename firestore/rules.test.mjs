@@ -136,7 +136,7 @@ test('a winning move records its server completion time', async () => {
 });
 
 // Ratings (SCRUM-30).
-const over = room({ o: 'omar', players: ['ayesha', 'omar'], status: 'over', winner: 'X', reason: 'line', moves: [0, 3, 1, 4, 2] });
+const over = room({ o: 'omar', players: ['ayesha', 'omar'], status: 'over', winner: 'X', reason: 'line', moves: [0, 3, 1, 4, 2], completedAt: new Date() });
 const rate = (uid, code = 'ABCDE') => {
   const fs = db(uid);
   const batch = writeBatch(fs);
@@ -183,4 +183,58 @@ test('a waiting player is matched only with a room just created by the matcher',
   await assertFails(updateDoc(doc(fs, 'queue/ayesha'), { rating: 2000 }));           // Other fields.
   await assertSucceeds(pair('MATCH', 'omar'));
   await assertFails(pair('MATC2', 'omar'));                                         // Already matched.
+});
+
+// Moderation (SCRUM-32).
+test('players report others but cannot read reports; admins can', async () => {
+  const report = (uid, about, id, room = 'ABCDE') =>
+    setDoc(doc(db(uid), `reports/${id}`), {
+      reporter: uid, reported: about, room, reason: '', status: 'open',
+    });
+  await seed(over);
+  await assertSucceeds(report('ayesha', 'omar', 'valid'));
+  await assertFails(report('ayesha', 'ayesha', 'self'));
+  await assertFails(report('zara', 'omar', 'not-a-player'));
+  await assertFails(report('ayesha', 'zara', 'reported-not-a-player'));
+  await assertFails(report('ayesha', 'omar', 'missing-room', 'NOPE1'));
+  await seed(playing());
+  await assertFails(report('ayesha', 'omar', 'unfinished-room'));
+  await assertFails(setDoc(doc(db('ayesha'), 'reports/fake'), {
+    reporter: 'omar', reported: 'zara', room: 'ABCDE', status: 'open',
+  }));
+  await assertFails(getDoc(doc(db('ayesha'), 'reports/valid')));
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'admins/boss'), { since: 1 }));
+  await assertSucceeds(getDoc(doc(db('boss'), 'reports/valid')));
+  await assertSucceeds(updateDoc(doc(db('boss'), 'reports/valid'), { status: 'suspended' }));
+});
+
+test('block markers are readable only by the blocker and blocked player', async () => {
+  const marker = 'users/ayesha/blocked/omar';
+  await assertSucceeds(setDoc(doc(db('ayesha'), marker), { at: serverTimestamp() }));
+  await assertSucceeds(getDoc(doc(db('ayesha'), marker)));
+  await assertSucceeds(getDoc(doc(db('omar'), marker)));
+  await assertFails(getDoc(doc(db('zara'), marker)));
+  await assertFails(setDoc(doc(db('omar'), 'users/ayesha/blocked/zara'), {
+    at: serverTimestamp(),
+  }));
+});
+
+test('only admins suspend, and nobody can make themselves an admin', async () => {
+  await assertFails(setDoc(doc(db('ayesha'), 'admins/ayesha'), { since: 1 }));
+  await assertFails(setDoc(doc(db('ayesha'), 'suspended/omar'), { by: 'ayesha' }));
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'admins/boss'), { since: 1 }));
+  await assertSucceeds(setDoc(doc(db('boss'), 'suspended/omar'), { by: 'boss' }));
+  await assertSucceeds(getDoc(doc(db('omar'), 'suspended/omar')));
+  await assertFails(getDoc(doc(db('ayesha'), 'suspended/omar')));
+  await assertSucceeds(getDoc(doc(db('boss'), 'suspended/omar')));
+});
+
+test('a suspended player cannot create, join or queue for online games', async () => {
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'suspended/omar'), { by: 'boss' }));
+  await assertFails(setDoc(doc(db('omar'), 'rooms/OMAR1'), room({ x: 'omar', players: ['omar'] })));
+  await assertFails(setDoc(doc(db('omar'), 'queue/omar'), { rating: 1200, size: 3, since: serverTimestamp(), room: null }));
+  await seed(room());
+  await assertFails(updateDoc(doc(db('omar'), 'rooms/ABCDE'), {
+    o: 'omar', players: ['ayesha', 'omar'], status: 'playing', lastMoveAt: serverTimestamp(),
+  }));
 });

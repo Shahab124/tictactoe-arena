@@ -4,8 +4,22 @@ rules_version = '2';
 // Everything else is denied.
 service cloud.firestore {
   match /databases/{database}/documents {
+    function notSuspended() {
+      return !exists(/databases/$(database)/documents/suspended/$(request.auth.uid));
+    }
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
     match /users/{uid}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    match /users/{blocker}/blocked/{blockedUid} {
+      allow read: if request.auth != null
+        && (request.auth.uid == blocker || request.auth.uid == blockedUid);
+      allow write: if request.auth != null
+        && request.auth.uid == blocker && blockedUid != blocker;
     }
 
     // One doc per username, so usernames are unique (REQ-ACC-05). Taking a
@@ -36,7 +50,8 @@ service cloud.firestore {
         return d().status == 'waiting' && d().o == null && me() != d().x
           && n().o == me() && n().players == [d().x, me()]
           && n().status == 'playing' && n().moves == d().moves
-          && n().lastMoveAt == request.time && n().completedAt == null;
+          && n().lastMoveAt == request.time && n().completedAt == null
+          && notSuspended();
       }
       function asBefore() {
         return n().o == d().o && n().players == d().players;
@@ -78,7 +93,8 @@ service cloud.firestore {
       allow create: if request.auth != null
         && n().x == me() && n().o == null && n().players == [me()]
         && n().status == 'waiting' && n().moves == []
-        && n().size in [3, 8] && n().completedAt == null;
+        && n().size in [3, 8] && n().completedAt == null
+        && notSuspended();
       allow update: if request.auth != null && fixed() && (joining()
         || (me() in d().players && d().status == 'playing'
             && (moving() || leaving() || timingOut())));
@@ -114,12 +130,38 @@ service cloud.firestore {
     // created as X.
     match /queue/{uid} {
       allow read: if request.auth != null;
-      allow create, delete: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null && request.auth.uid == uid && notSuspended();
+      allow delete: if request.auth != null && request.auth.uid == uid;
       allow update: if request.auth != null && resource.data.room == null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['room'])
         && getAfter(/databases/$(database)/documents/rooms/$(request.resource.data.room)).data.x
            == request.auth.uid
         && !exists(/databases/$(database)/documents/rooms/$(request.resource.data.room));
+    }
+
+    // Moderation (REQ-ONL-08, ADM-01, ADM-03). Admins are added by hand in
+    // the Firebase console; the app can never create or change one.
+    match /admins/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+    }
+    match /reports/{id} {
+      allow create: if request.auth != null
+        && request.resource.data.reporter == request.auth.uid
+        && request.resource.data.reported is string
+        && request.resource.data.reported != request.auth.uid
+        && request.resource.data.room is string
+        && exists(/databases/$(database)/documents/rooms/$(request.resource.data.room))
+        && get(/databases/$(database)/documents/rooms/$(request.resource.data.room)).data.status == 'over'
+        && get(/databases/$(database)/documents/rooms/$(request.resource.data.room)).data.completedAt is timestamp
+        && request.auth.uid in get(/databases/$(database)/documents/rooms/$(request.resource.data.room)).data.players
+        && request.resource.data.reported in get(/databases/$(database)/documents/rooms/$(request.resource.data.room)).data.players
+        && request.resource.data.status == 'open';
+      allow read, update: if isAdmin();
+    }
+    match /suspended/{uid} {
+      allow read: if request.auth != null
+        && (request.auth.uid == uid || isAdmin());
+      allow write: if isAdmin();
     }
   }
 }

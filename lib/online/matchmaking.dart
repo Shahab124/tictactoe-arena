@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'moderation.dart';
 import 'ratings.dart';
 
 /// How far apart two ratings may be: 100 points at first, widening by 50
@@ -34,23 +35,26 @@ class Matchmaker {
   Future<String?> findOrWait(String uid, {int size = 3, DateTime? now}) async {
     final time = now ?? await ratings.serverNow(uid);
     final mine = (await ratings.of(uid)).rating;
+    final moderation = Moderation(firestore);
+    final blocked = await moderation.blocked(uid);
     int gap(QueryDocumentSnapshot<Map<String, dynamic>> d) =>
         ((d.data()['rating'] as int? ?? startRating) - mine).abs();
-    final waiting =
-        (await _queue
-                .where('size', isEqualTo: size)
-                .where('room', isNull: true)
-                .get())
-            .docs
-            .where((d) {
-              final since = (d.data()['since'] as Timestamp?)?.toDate() ?? time;
-              return d.id != uid &&
-                  gap(d) <= allowedGap(time.difference(since));
-            })
-            .toList()
-          ..sort((a, b) => gap(a).compareTo(gap(b)));
+    final waiting = (await _queue
+            .where('size', isEqualTo: size)
+            .where('room', isNull: true)
+            .get())
+        .docs
+        .where((d) {
+          final since = (d.data()['since'] as Timestamp?)?.toDate() ?? time;
+          return d.id != uid &&
+              !blocked.contains(d.id) &&
+              gap(d) <= allowedGap(time.difference(since));
+        })
+        .toList()
+      ..sort((a, b) => gap(a).compareTo(gap(b)));
 
     for (final candidate in waiting) {
+      if (await moderation.isBlockedBy(candidate.id, uid)) continue;
       final code = await _pair(uid, candidate.reference, size);
       if (code != null) return code;
     }
@@ -75,10 +79,24 @@ class Matchmaker {
       (_) => _letters[_random.nextInt(_letters.length)],
     ).join();
     final room = firestore.collection('rooms').doc(code);
+    final blockedByMe = firestore
+        .collection('users')
+        .doc(uid)
+        .collection('blocked')
+        .doc(other.id);
+    final blockedByOther = firestore
+        .collection('users')
+        .doc(other.id)
+        .collection('blocked')
+        .doc(uid);
     return firestore.runTransaction((t) async {
       final snap = await t.get(other);
       if (!snap.exists || snap.data()!['room'] != null) return null;
       if ((await t.get(room)).exists) return null;
+      if ((await t.get(blockedByMe)).exists ||
+          (await t.get(blockedByOther)).exists) {
+        return null;
+      }
       t.set(room, {
         'size': size,
         'winLength': size == 3 ? 3 : 5,
