@@ -8,6 +8,16 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
+    // One doc per username, so usernames are unique (REQ-ACC-05). Taking a
+    // name that exists would be an update, which is never allowed.
+    match /usernames/{name} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && name.matches('^[a-z0-9_]{3,15}$');
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+
     // Online games (REQ-ONL-02, 04, 06). Any signed-in player can look up a
     // room by its code; only the two players can change it, and only by
     // joining, playing their own turn, leaving, or claiming a timed-out game.
@@ -26,10 +36,15 @@ service cloud.firestore {
         return d().status == 'waiting' && d().o == null && me() != d().x
           && n().o == me() && n().players == [d().x, me()]
           && n().status == 'playing' && n().moves == d().moves
-          && n().lastMoveAt == request.time;
+          && n().lastMoveAt == request.time && n().completedAt == null;
       }
       function asBefore() {
         return n().o == d().o && n().players == d().players;
+      }
+      function completionTime() {
+        return n().status == 'over'
+          ? n().completedAt == request.time
+          : n().completedAt == d().completedAt;
       }
       // One new move on an empty cell, by the player whose turn it is.
       // ponytail: the win a mover reports isn't re-checked here; the app
@@ -44,11 +59,13 @@ service cloud.firestore {
           && n().moves[d().moves.size()] < d().size * d().size
           && !(n().moves[d().moves.size()] in d().moves)
           && n().lastMoveAt == request.time
+          && completionTime()
           && (n().status == 'playing' || n().status == 'over');
       }
       function ending(winner, reason) {
         return asBefore() && n().moves == d().moves && n().status == 'over'
-          && n().winner == winner && n().reason == reason;
+          && n().winner == winner && n().reason == reason
+          && n().completedAt == request.time;
       }
       function leaving() { return ending(otherMark(), 'left'); }
       function timingOut() {
@@ -61,20 +78,36 @@ service cloud.firestore {
       allow create: if request.auth != null
         && n().x == me() && n().o == null && n().players == [me()]
         && n().status == 'waiting' && n().moves == []
-        && n().size in [3, 8];
+        && n().size in [3, 8] && n().completedAt == null;
       allow update: if request.auth != null && fixed() && (joining()
         || (me() in d().players && d().status == 'playing'
             && (moving() || leaving() || timingOut())));
     }
 
-    // One doc per username, so usernames are unique (REQ-ACC-05). Taking a
-    // name that exists would be an update, which is never allowed.
-    match /usernames/{name} {
+    // Ratings (REQ-RANK-01, 02). Anyone signed in can read the leaderboards.
+    // A player changes only their own rating, once per finished online game
+    // they played in; ratings/<uid>/rated/<room code> marks it as counted.
+    match /ratings/{uid} {
+      function room(code) {
+        return get(/databases/$(database)/documents/rooms/$(code)).data;
+      }
+      function marker(code) {
+        return /databases/$(database)/documents/ratings/$(uid)/rated/$(code);
+      }
+      function counted(code) {
+        return room(code).status == 'over' && uid in room(code).players
+          && !exists(marker(code)) && existsAfter(marker(code));
+      }
       allow read: if request.auth != null;
-      allow create: if request.auth != null
-        && request.resource.data.uid == request.auth.uid
-        && name.matches('^[a-z0-9_]{3,15}$');
-      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.rating is int
+        && counted(request.resource.data.lastRoom);
+      match /rated/{code} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow create: if request.auth != null && request.auth.uid == uid
+          && room(code).status == 'over' && uid in room(code).players;
+      }
     }
+
   }
 }

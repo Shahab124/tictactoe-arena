@@ -6,7 +6,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { deleteDoc, doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 
 const env = await initializeTestEnvironment({
   projectId: 'demo-tictactoe-arena',
@@ -41,10 +41,27 @@ test('collections outside users/ are closed', async () => {
   await assertFails(setDoc(doc(db('ayesha'), 'leaderboard/top'), { score: 1 }));
 });
 
+test('a player can claim a free username and release it', async () => {
+  await assertSucceeds(setDoc(doc(db('ayesha'), 'usernames/ayesha_k'), { uid: 'ayesha' }));
+  await assertSucceeds(getDoc(doc(db('omar'), 'usernames/ayesha_k')));
+  await assertSucceeds(deleteDoc(doc(db('ayesha'), 'usernames/ayesha_k')));
+});
+
+test("usernames are unique and can't be taken or claimed for someone else", async () => {
+  await env.withSecurityRulesDisabled((ctx) =>
+    setDoc(doc(ctx.firestore(), 'usernames/omar'), { uid: 'omar' }));
+  await assertFails(setDoc(doc(db('ayesha'), 'usernames/omar'), { uid: 'ayesha' }));
+  await assertFails(deleteDoc(doc(db('ayesha'), 'usernames/omar')));
+  await assertFails(setDoc(doc(db('ayesha'), 'usernames/zara'), { uid: 'zara' }));
+  await assertFails(setDoc(doc(db('ayesha'), 'usernames/Bad Name!'), { uid: 'ayesha' }));
+  await assertFails(getDoc(doc(db(null), 'usernames/omar')));
+});
+
 // Online rooms (SCRUM-29).
 const room = (extra = {}) => ({
   size: 3, winLength: 3, x: 'ayesha', o: null, players: ['ayesha'],
-  moves: [], status: 'waiting', winner: null, reason: null, lastMoveAt: null, ...extra,
+  moves: [], status: 'waiting', winner: null, reason: null, lastMoveAt: null,
+  completedAt: null, ...extra,
 });
 const playing = (extra = {}) =>
   room({ o: 'omar', players: ['ayesha', 'omar'], status: 'playing', lastMoveAt: new Date(), ...extra });
@@ -86,29 +103,60 @@ test('someone not in the game cannot change it or join a full room', async () =>
 test('a player who leaves loses, and cannot hand themselves the win', async () => {
   await seed(playing());
   await assertFails(updateDoc(doc(db('omar'), 'rooms/ABCDE'), { status: 'over', winner: 'O', reason: 'left' }));
-  await assertSucceeds(updateDoc(doc(db('omar'), 'rooms/ABCDE'), { status: 'over', winner: 'X', reason: 'left' }));
+  await assertFails(updateDoc(doc(db('omar'), 'rooms/ABCDE'), {
+    status: 'over', winner: 'X', reason: 'left',
+  }));
+  await assertSucceeds(updateDoc(doc(db('omar'), 'rooms/ABCDE'), {
+    status: 'over', winner: 'X', reason: 'left', completedAt: serverTimestamp(),
+  }));
 });
 
 test('a win on time can be claimed only after 60 seconds', async () => {
-  const claim = () => updateDoc(doc(db('omar'), 'rooms/ABCDE'), { status: 'over', winner: 'O', reason: 'timeout' });
+  const claim = () => updateDoc(doc(db('omar'), 'rooms/ABCDE'), {
+    status: 'over', winner: 'O', reason: 'timeout', completedAt: serverTimestamp(),
+  });
   await seed(playing());                                          // X to move, just started.
   await assertFails(claim());
   await seed(playing({ lastMoveAt: new Date(Date.now() - 61000) }));
   await assertSucceeds(claim());
 });
 
-test('a player can claim a free username and release it', async () => {
-  await assertSucceeds(setDoc(doc(db('ayesha'), 'usernames/ayesha_k'), { uid: 'ayesha' }));
-  await assertSucceeds(getDoc(doc(db('omar'), 'usernames/ayesha_k')));
-  await assertSucceeds(deleteDoc(doc(db('ayesha'), 'usernames/ayesha_k')));
+test('a winning move records its server completion time', async () => {
+  await seed(playing({ moves: [0, 3, 1, 4] }));
+  const win = (completedAt) => updateDoc(doc(db('ayesha'), 'rooms/ABCDE'), {
+    moves: [0, 3, 1, 4, 2],
+    status: 'over',
+    winner: 'X',
+    reason: 'line',
+    lastMoveAt: serverTimestamp(),
+    ...(completedAt ? { completedAt } : {}),
+  });
+  await assertFails(win(null));
+  await assertSucceeds(win(serverTimestamp()));
 });
 
-test("usernames are unique and can't be taken or claimed for someone else", async () => {
-  await env.withSecurityRulesDisabled((ctx) =>
-    setDoc(doc(ctx.firestore(), 'usernames/omar'), { uid: 'omar' }));
-  await assertFails(setDoc(doc(db('ayesha'), 'usernames/omar'), { uid: 'ayesha' }));
-  await assertFails(deleteDoc(doc(db('ayesha'), 'usernames/omar')));
-  await assertFails(setDoc(doc(db('ayesha'), 'usernames/zara'), { uid: 'zara' }));
-  await assertFails(setDoc(doc(db('ayesha'), 'usernames/Bad Name!'), { uid: 'ayesha' }));
-  await assertFails(getDoc(doc(db(null), 'usernames/omar')));
+// Ratings (SCRUM-30).
+const over = room({ o: 'omar', players: ['ayesha', 'omar'], status: 'over', winner: 'X', reason: 'line', moves: [0, 3, 1, 4, 2] });
+const rate = (uid, code = 'ABCDE') => {
+  const fs = db(uid);
+  const batch = writeBatch(fs);
+  batch.set(doc(fs, `ratings/${uid}/rated/${code}`), { at: 1 });
+  batch.set(doc(fs, `ratings/${uid}`), { name: uid, rating: 1216, games: 1, week: '2026-W48', weekPoints: 3, lastRoom: code });
+  return batch.commit();
+};
+
+test('a player rates a finished game they played in, once', async () => {
+  await seed(over);
+  await assertSucceeds(rate('ayesha'));
+  await assertFails(rate('ayesha'));                 // Already counted.
+  await assertSucceeds(getDoc(doc(db('zara'), 'ratings/ayesha')));
+});
+
+test('no rating without a finished game, for someone else, or for a game not played', async () => {
+  await seed(playing());
+  await assertFails(rate('ayesha'));                 // Game not over.
+  await seed(over);
+  await assertFails(rate('zara'));                   // Not in the game.
+  await assertFails(setDoc(doc(db('ayesha'), 'ratings/omar'), { rating: 2000, lastRoom: 'ABCDE' }));
+  await assertFails(setDoc(doc(db('ayesha'), 'ratings/ayesha'), { rating: 2000, lastRoom: 'ABCDE' })); // No marker.
 });

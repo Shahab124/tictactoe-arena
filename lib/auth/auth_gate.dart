@@ -9,6 +9,7 @@ import '../game/setup_screen.dart';
 import '../ui/settings_screen.dart';
 import '../online/online_rooms.dart';
 import '../online/online_screen.dart';
+import '../online/ratings.dart';
 import '../ui/theme.dart';
 import 'profile.dart';
 import 'sign_in_screen.dart';
@@ -83,6 +84,7 @@ class _AuthGateState extends State<AuthGate> {
               : () => Navigator.of(context).push(MaterialPageRoute(
                   builder: (_) => OnlineLobby(
                       rooms: OnlineRooms(widget.store.firestore),
+                      ratings: Ratings(widget.store.firestore),
                       uid: user.uid))),
           onPlay: (size) => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => SetupScreen(
