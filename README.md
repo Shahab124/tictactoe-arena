@@ -161,6 +161,73 @@ It prints:
 
 Every pull request and every merge to `main` also builds a release Android APK and the web version. Open the **Actions** tab on GitHub, pick the latest **CI** run on `main`, and download `tictactoe-arena-apk` or `tictactoe-arena-web` under **Artifacts** (you must be signed in to GitHub). Unzip the APK artifact and open `app-release.apk` on an Android phone to install it (allow installs from unknown sources). Each build has a new signature, so uninstall the old version before installing a new one.
 
+## User guide
+
+### 1. Get the app
+
+**Android phone**
+
+1. On GitHub, open the **Actions** tab, click the latest **CI** run on `main` with a green tick, and download **tictactoe-arena-apk** under **Artifacts** (you must be signed in to GitHub).
+2. Unzip it and copy `app-release.apk` to the phone.
+3. Open the file on the phone. If Android asks, allow installs from this source (Settings → Apps → Special access → Install unknown apps), then tap **Install**.
+
+**Web browser**
+
+Follow [Build and run](#build-and-run) above and finish with `flutter run -d chrome`. The game opens in Chrome. Or download **tictactoe-arena-web** from the same CI run and serve the unzipped folder with any static web server.
+
+Android and web are the versions we build and test. `flutter run -d windows` may also work if you have Visual Studio with the C++ desktop tools, but we have not tested it.
+
+### 2. Sign in
+
+- **Sign up** with an email and password, or **Continue with Google**.
+- **Play as guest** to play on this device without an account. Guests cannot play online. To make an account later, tap **Sign up** at the top of the home screen; games played as a guest move to the new account.
+- **Forgot password?** sends a reset email to the address you typed.
+
+The first time the app opens, a short **How to play** tutorial appears before sign-in. Tap **Next** or **Skip**. You can open it again from **Settings → How to play**.
+
+### 3. Play
+
+On the home screen pick **Classic 3×3** or **Big 8×8**. On the setup screen choose:
+
+- **Mode:** **Two players** (take turns on one device) or **Computer**.
+- **Difficulty** (Computer only): **Easy**, **Medium**, **Hard** or **Expert**. Hard never loses on 3×3.
+- On 8×8, **4 in a row** or **5 in a row** wins. Pinch the board to zoom on a phone.
+- **You play** X or O, **Who starts**, and **Match** (**Single**, **Best of 3** or **Best of 5**).
+
+Tap **Start game**. Tap an empty cell to place your mark. Against the computer you can use **Hint**, **Undo** and, after the game, **Replay** to step through the moves with the best and worst ones marked. **Rematch** plays again with the same options. If you leave a game unfinished, the setup screen offers **Continue unfinished game**, also on another device signed in to the same account.
+
+**Online (needs an account and internet)**
+
+Tap **Play online** on the home screen and pick **3×3** or **8×8**.
+
+- **Create room** shows a 5-letter code. Send it to your friend; they type it and tap **Join room**. You are X, they are O.
+- **Find a match** pairs you with a waiting player with a similar rating. The allowed rating gap grows the longer you wait. **Cancel** leaves the queue.
+- Each turn has a 60-second limit. If the other player runs out of time, **Claim win** appears.
+- **Leave (you lose)** ends the game as a loss. If the app closes by accident, open **Play online** again and tap **Rejoin game**.
+- After the game, **Report** sends the player to the admins and **Block** stops you being matched with them again.
+- Every online game is ranked. Your rating starts at 1200 and is shown on the **Play online** screen. **Leaderboards** has **All time** (highest rating) and **This week** (3 points per win, 1 per draw).
+
+### 4. History, profile and settings
+
+- **History & statistics**: your finished games, wins and win rate.
+- **Profile**: username (must be unique), avatar, and **Delete account**.
+- **Settings**: **Theme** (System, Light, Dark), **Skin** for the board and marks, **Sound**, **Vibration**, **Language** (English or اردو, right-to-left) and **Colour-blind friendly colours** (blue and orange). Settings follow your account to other devices.
+
+### 5. Make someone an admin
+
+1. The person signs up and signs in once.
+2. In the [Firebase console](https://console.firebase.google.com/) open project `tictactoe-arena-9ece4` → **Authentication** → **Users** and copy their **User UID**.
+3. Go to **Firestore Database**, open (or start) the collection `admins`, and add a document whose **Document ID** is that UID. It needs no fields; add any one field, for example `name`, if the console asks for one.
+4. The person reopens **Play online** and sees **Admin dashboard**. It lists open reports; **Dismiss** closes a report and **Suspend** blocks that player from online games.
+
+Only people with access to the Firebase project can add admins. The app has no way to make yourself an admin.
+
+### 6. Known limits
+
+- There is no friends list, so there is no friends leaderboard; only all-time and weekly.
+- Online ratings are worked out on each player's device. The database rules check the game really finished and is counted once, but a determined cheater could send a wrong rating.
+- The Android APK is signed with a new key on every build, so uninstall the old app before installing a newer APK.
+
 ## How we work
 
 Never commit directly to `main`.
