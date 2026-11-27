@@ -4,6 +4,7 @@ import 'package:game_engine/game_engine.dart';
 import '../data/game_store.dart';
 import 'ai_client.dart';
 import 'game_screen.dart';
+import '../ui/strings.dart';
 
 /// Game setup: the player picks the board size, win length on 8×8, the mode,
 /// X or O and who starts, and a single game or a best-of-3/5 match
@@ -65,8 +66,7 @@ class _SetupScreenState extends State<SetupScreen> {
   }
 
   Future<void> _open(GameScreen game) async {
-    await Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => game));
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => game));
     _load(); // the game may have finished or been left unfinished
   }
 
@@ -112,7 +112,7 @@ class _SetupScreenState extends State<SetupScreen> {
     final label = text.titleMedium?.copyWith(fontWeight: FontWeight.w700);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('New game',
+        title: Text(context.tr('New game'),
             style: TextStyle(fontWeight: FontWeight.w800)),
       ),
       body: SafeArea(
@@ -127,51 +127,56 @@ class _SetupScreenState extends State<SetupScreen> {
                 children: [
                   if (_current != null) ...[
                     FilledButton.tonalIcon(
-                      onPressed: () => _open(GameScreen.resume(
-                          _current!, store: widget.store, uid: widget.uid)),
+                      onPressed: () => _open(GameScreen.resume(_current!,
+                          store: widget.store, uid: widget.uid)),
                       icon: const Icon(Icons.play_circle_outline_rounded),
-                      label: const Text('Continue unfinished game'),
+                      label: Text(context.tr('Continue unfinished game')),
                     ),
                     const SizedBox(height: 24),
                   ],
-                  Text('Board', style: label),
+                  Text(context.tr('Board'), style: label),
                   const SizedBox(height: 8),
                   SegmentedButton<int>(
-                    segments: const [
+                    segments: [
                       ButtonSegment(
                           value: 3,
                           icon: Icon(Icons.grid_3x3_rounded),
-                          label: Text('Classic 3×3')),
+                          label: Text(context.tr('Classic 3×3'))),
                       ButtonSegment(
                           value: 8,
                           icon: Icon(Icons.grid_4x4_rounded),
-                          label: Text('Big 8×8')),
+                          label: Text(context.tr('Big 8×8'))),
                     ],
                     selected: {_size},
                     onSelectionChanged: (s) => setState(() => _size = s.single),
                   ),
                   const SizedBox(height: 8),
                   if (_size == 8) ...[
-                    _choice([(4, '4 in a row'), (5, '5 in a row')], _winLength,
+                    _choice(
+                        [
+                          (4, context.tr('4 in a row')),
+                          (5, context.tr('5 in a row')),
+                        ],
+                        _winLength,
                         (v) => _winLength = v),
                     const SizedBox(height: 8),
                   ],
-                  Text(_size == 3
+                  Text(context.tr(_size == 3
                       ? 'Three in a row wins.'
-                      : '${_winLength == 4 ? 'Four' : 'Five'} in a row wins. Pinch the board to zoom.'),
+                      : '${_winLength == 4 ? 'Four' : 'Five'} in a row wins. Pinch the board to zoom.')),
                   const SizedBox(height: 24),
-                  Text('Mode', style: label),
+                  Text(context.tr('Mode'), style: label),
                   const SizedBox(height: 8),
                   SegmentedButton<String>(
-                    segments: const [
+                    segments: [
                       ButtonSegment(
                           value: 'local',
                           icon: Icon(Icons.people_alt_rounded),
-                          label: Text('Two players')),
+                          label: Text(context.tr('Two players'))),
                       ButtonSegment(
                           value: 'computer',
                           icon: Icon(Icons.smart_toy_rounded),
-                          label: Text('Computer')),
+                          label: Text(context.tr('Computer'))),
                     ],
                     selected: {_mode},
                     onSelectionChanged: (s) => setState(() => _mode = s.single),
@@ -182,24 +187,25 @@ class _SetupScreenState extends State<SetupScreen> {
                       : 'Works without internet.'),
                   if (_mode == 'computer') ...[
                     const SizedBox(height: 24),
-                    Text('Difficulty', style: label),
+                    Text(context.tr('Difficulty'), style: label),
                     const SizedBox(height: 8),
                     Wrap(spacing: 8, runSpacing: 8, children: [
                       for (final d in difficulties)
                         ChoiceChip(
-                          label: Text('${d[0].toUpperCase()}${d.substring(1)}'),
+                          label: Text(context
+                              .tr('${d[0].toUpperCase()}${d.substring(1)}')),
                           selected: _difficulty == d,
                           onSelected: (_) => setState(() => _difficulty = d),
                         ),
                     ]),
                     const SizedBox(height: 24),
-                    Text('You play', style: label),
+                    Text(context.tr('You play'), style: label),
                     const SizedBox(height: 8),
                     _choice([(Mark.x, 'X'), (Mark.o, 'O')], _playerMark,
                         (v) => _playerMark = v),
                   ],
                   const SizedBox(height: 24),
-                  Text('Who starts', style: label),
+                  Text(context.tr('Who starts'), style: label),
                   const SizedBox(height: 8),
                   _choice(
                       _vsComputer
@@ -208,7 +214,7 @@ class _SetupScreenState extends State<SetupScreen> {
                       _youStart,
                       (v) => _youStart = v),
                   const SizedBox(height: 24),
-                  Text('Match', style: label),
+                  Text(context.tr('Match'), style: label),
                   const SizedBox(height: 8),
                   _choice([(1, 'Single'), (3, 'Best of 3'), (5, 'Best of 5')],
                       _bestOf, (v) => _bestOf = v),
@@ -216,7 +222,7 @@ class _SetupScreenState extends State<SetupScreen> {
                   FilledButton.icon(
                     onPressed: _start,
                     icon: const Icon(Icons.play_arrow_rounded),
-                    label: const Text('Start game'),
+                    label: Text(context.tr('Start game')),
                   ),
                 ],
               ),

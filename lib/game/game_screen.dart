@@ -8,6 +8,7 @@ import '../ui/mark.dart';
 import '../ui/theme.dart';
 import 'ai_client.dart';
 import 'replay_screen.dart';
+import '../ui/strings.dart';
 
 /// A game on one device: two local players (REQ-MODE-02), or the player as X
 /// against the computer as O when [difficulty] is set (REQ-MODE-01). Shows
@@ -127,7 +128,7 @@ class _GameScreenState extends State<GameScreen> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-            const SnackBar(content: Text('That cell is already taken')));
+            SnackBar(content: Text(context.tr('That cell is already taken'))));
       return;
     }
     if (result != MoveResult.ok) return; // game over: ignore (D3 REQ-PLAT 6.1)
@@ -217,8 +218,8 @@ class _GameScreenState extends State<GameScreen> {
     final moves = _game.isOver ? const <(int, int)>[] : _game.moves;
     final done = _game.isOver && (widget.bestOf == 1 || _matchOver);
     final fresh = moves.isEmpty && _wins.values.every((w) => w == 0);
-    widget.store.saveCurrent(done || fresh ? null : _toSaved(moves),
-        uid: widget.uid);
+    widget.store
+        .saveCurrent(done || fresh ? null : _toSaved(moves), uid: widget.uid);
   }
 
   Map<String, dynamic> _toSaved(List<(int, int)> moves) => {
@@ -228,7 +229,9 @@ class _GameScreenState extends State<GameScreen> {
         'playerMark': widget.playerMark.symbol,
         'firstToMove': widget.firstToMove.symbol,
         'bestOf': widget.bestOf,
-        'moves': [for (final (r, c) in moves) {'r': r, 'c': c}],
+        'moves': [
+          for (final (r, c) in moves) {'r': r, 'c': c}
+        ],
         'wins': {'X': _wins[Mark.x], 'O': _wins[Mark.o]},
       };
 
@@ -273,18 +276,18 @@ class _GameScreenState extends State<GameScreen> {
   void _save() {
     final me = _vsComputer ? widget.playerMark : Mark.x;
     _record = GameRecord(
-        boardSize: _game.size,
-        winLength: _game.winLength,
-        mode: _vsComputer ? 'computer' : 'local',
-        opponent: _vsComputer ? _opponent : 'Local player',
-        moves: _game.moves,
-        result: switch (_game.status) {
-          GameStatus.draw => 'draw',
-          GameStatus.xWon => me == Mark.x ? 'win' : 'loss',
-          _ => me == Mark.o ? 'win' : 'loss',
-        },
-        playedAt: DateTime.now(),
-        firstMark: _game.firstToMove.symbol,
+      boardSize: _game.size,
+      winLength: _game.winLength,
+      mode: _vsComputer ? 'computer' : 'local',
+      opponent: _vsComputer ? _opponent : 'Local player',
+      moves: _game.moves,
+      result: switch (_game.status) {
+        GameStatus.draw => 'draw',
+        GameStatus.xWon => me == Mark.x ? 'win' : 'loss',
+        _ => me == Mark.o ? 'win' : 'loss',
+      },
+      playedAt: DateTime.now(),
+      firstMark: _game.firstToMove.symbol,
     );
     widget.store.save(_record!, uid: widget.uid);
   }
@@ -348,7 +351,7 @@ class _GameScreenState extends State<GameScreen> {
               scale: Tween(begin: 0.85, end: 1.0).animate(a), child: child),
         ),
         child: Text(
-          _statusText,
+          context.tr(_statusText),
           key: ValueKey(_statusText),
           textAlign: TextAlign.center,
           style: Theme.of(context)
@@ -398,9 +401,9 @@ class _GameScreenState extends State<GameScreen> {
               style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
       if (widget.size == 8)
-        const Padding(
+        Padding(
           padding: EdgeInsets.only(bottom: 8),
-          child: Text('Pinch to zoom, drag to move'),
+          child: Text(context.tr('Pinch to zoom, drag to move')),
         ),
     ];
     final button = _aiFailed
@@ -408,12 +411,12 @@ class _GameScreenState extends State<GameScreen> {
             Expanded(
               child: OutlinedButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('End game')),
+                  child: Text(context.tr('End game'))),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: FilledButton(
-                  onPressed: _computerTurn, child: const Text('Retry')),
+                  onPressed: _computerTurn, child: Text(context.tr('Retry'))),
             ),
           ])
         : Wrap(
@@ -425,7 +428,7 @@ class _GameScreenState extends State<GameScreen> {
                   OutlinedButton.icon(
                     onPressed: _canHint ? _showHint : null,
                     icon: const Icon(Icons.lightbulb_outline_rounded),
-                    label: const Text('Hint'),
+                    label: Text(context.tr('Hint')),
                   ),
                 if (_game.isOver && _record != null)
                   OutlinedButton.icon(
@@ -433,13 +436,13 @@ class _GameScreenState extends State<GameScreen> {
                         MaterialPageRoute(
                             builder: (_) => ReplayScreen(game: _record!))),
                     icon: const Icon(Icons.slideshow_rounded),
-                    label: const Text('Replay'),
+                    label: Text(context.tr('Replay')),
                   ),
                 if (_vsComputer)
                   OutlinedButton.icon(
                     onPressed: _canUndo ? _undo : null,
                     icon: const Icon(Icons.undo_rounded),
-                    label: const Text('Undo'),
+                    label: Text(context.tr('Undo')),
                   ),
                 FilledButton.icon(
                   onPressed: _restart,
@@ -557,11 +560,15 @@ class _Cell extends StatelessWidget {
           color: highlighted
               ? ArenaColors.win.withValues(alpha: 0.45)
               : colors.surfaceContainerHighest,
-          border: hinted || lastMove
-              ? Border.all(
-                  color: hinted ? Colors.green : colors.primary,
-                  width: radius > 10 ? 3 : 2)
-              : null,
+          // The winning line also gets a thick outline, so it shows without
+          // relying on colour (REQ-UX-07).
+          border: highlighted
+              ? Border.all(color: colors.onSurface, width: radius > 10 ? 4 : 3)
+              : hinted || lastMove
+                  ? Border.all(
+                      color: hinted ? Colors.green : colors.primary,
+                      width: radius > 10 ? 3 : 2)
+                  : null,
           boxShadow: highlighted
               ? [
                   BoxShadow(
@@ -594,8 +601,8 @@ class _PlayerChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final skin = AppSettings.of(context).skin;
-    final color = mark == Mark.x ? skin.x : skin.o;
+    final s = AppSettings.of(context);
+    final color = mark == Mark.x ? s.xColor : s.oColor;
     return ExcludeSemantics(
       child: AnimatedContainer(
         duration: motion(context, 250),

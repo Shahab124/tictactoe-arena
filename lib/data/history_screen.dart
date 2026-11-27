@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../game/replay_screen.dart';
 import 'game_record.dart';
 import 'game_store.dart';
+import '../ui/strings.dart';
 
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key, required this.store, this.uid});
@@ -16,19 +17,20 @@ class HistoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('History & statistics')),
+      appBar: AppBar(title: Text(context.tr('History & statistics'))),
       body: FutureBuilder<List<GameRecord>>(
         future: store.history(uid: uid),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return const Center(child: Text('Could not load your games.'));
+            return Center(
+                child: Text(context.tr('Could not load your games.')));
           }
           final games = snapshot.data;
           if (games == null) {
             return const Center(child: CircularProgressIndicator());
           }
           if (games.isEmpty) {
-            return const Center(child: Text('No games played yet.'));
+            return Center(child: Text(context.tr('No games played yet.')));
           }
           final stats = Stats.byBoardAndMode(games);
           return ListView(
@@ -44,10 +46,10 @@ class HistoryScreen extends StatelessWidget {
               for (final g in games)
                 ListTile(
                   leading: Text(g.result.toUpperCase()),
-                  title: Text('vs ${g.opponent}'),
+                  title: Text(context.tr('vs ${g.opponent}')),
                   trailing: const Icon(Icons.slideshow_rounded),
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => ReplayScreen(game: g))),
+                  onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => ReplayScreen(game: g))),
                   subtitle: Text('${g.boardSize}×${g.boardSize}, '
                       '${g.winLength} in a row · '
                       '${MaterialLocalizations.of(context).formatMediumDate(g.playedAt.toLocal())}'),

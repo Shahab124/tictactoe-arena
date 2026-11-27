@@ -13,6 +13,7 @@ import '../online/ratings.dart';
 import '../ui/theme.dart';
 import 'profile.dart';
 import 'sign_in_screen.dart';
+import '../ui/strings.dart';
 
 /// Shows the sign-in screen until the player signs in or chooses guest play.
 ///
@@ -147,7 +148,8 @@ class HomeScreen extends StatelessWidget {
                 onPressed: onProfile,
                 tooltip: 'Profile',
                 icon: const Icon(Icons.account_circle_outlined)),
-          TextButton(onPressed: onSignOut, child: Text(signOutLabel)),
+          TextButton(
+              onPressed: onSignOut, child: Text(context.tr(signOutLabel))),
         ],
       ),
       body: Center(
@@ -160,12 +162,15 @@ class HomeScreen extends StatelessWidget {
               children: [
                 _Reveal(
                   order: 0,
-                  child: Text('Ready to play?',
+                  child: Text(context.tr('Ready to play?'),
                       style: text.headlineMedium
                           ?.copyWith(fontWeight: FontWeight.w800)),
                 ),
                 const SizedBox(height: 4),
-                _Reveal(order: 0, child: Text('Playing as $name', style: text.bodyLarge)),
+                _Reveal(
+                    order: 0,
+                    child: Text(context.tr('Playing as $name'),
+                        style: text.bodyLarge)),
                 const SizedBox(height: 24),
                 LayoutBuilder(
                   builder: (context, constraints) => constraints.maxWidth > 560
@@ -174,11 +179,13 @@ class HomeScreen extends StatelessWidget {
                           const SizedBox(width: 16),
                           Expanded(child: _Reveal(order: 2, child: big)),
                         ])
-                      : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                          _Reveal(order: 1, child: classic),
-                          const SizedBox(height: 16),
-                          _Reveal(order: 2, child: big),
-                        ]),
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                              _Reveal(order: 1, child: classic),
+                              const SizedBox(height: 16),
+                              _Reveal(order: 2, child: big),
+                            ]),
                 ),
                 const SizedBox(height: 16),
                 _Reveal(
@@ -186,12 +193,13 @@ class HomeScreen extends StatelessWidget {
                   child: Card(
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 8),
                       leading: const Icon(Icons.insights_rounded, size: 32),
-                      title: const Text('History & statistics',
+                      title: Text(context.tr('History & statistics'),
                           style: TextStyle(fontWeight: FontWeight.w700)),
-                      subtitle: const Text('Your games, wins and win rate'),
+                      subtitle:
+                          Text(context.tr('Your games, wins and win rate')),
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: onHistory,
                     ),
@@ -248,7 +256,9 @@ class _ModeCard extends StatelessWidget {
       child: Ink(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-              colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
+              colors: colors,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight),
         ),
         child: InkWell(
           onTap: onTap,
@@ -259,15 +269,16 @@ class _ModeCard extends StatelessWidget {
               children: [
                 Icon(icon, color: Colors.white, size: 40),
                 const SizedBox(height: 28),
-                Text(title,
+                Text(context.tr(title),
                     style: const TextStyle(
                         color: Colors.white,
                         fontSize: 24,
                         fontWeight: FontWeight.w800)),
                 const SizedBox(height: 4),
-                Text(subtitle,
+                Text(context.tr(subtitle),
                     style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.92), fontSize: 15)),
+                        color: Colors.white.withValues(alpha: 0.92),
+                        fontSize: 15)),
               ],
             ),
           ),
@@ -293,7 +304,8 @@ class _Reveal extends StatelessWidget {
       curve: Interval(start / (1 + start), 1, curve: Curves.easeOutCubic),
       builder: (context, t, child) => Opacity(
         opacity: t,
-        child: Transform.translate(offset: Offset(0, 16 * (1 - t)), child: child),
+        child:
+            Transform.translate(offset: Offset(0, 16 * (1 - t)), child: child),
       ),
       child: child,
     );

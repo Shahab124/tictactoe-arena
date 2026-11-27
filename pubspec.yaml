@@ -12,6 +12,8 @@ dependencies:
   firebase_core: ^5.1.0
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   game_ai:
     path: packages/game_ai
   game_engine:

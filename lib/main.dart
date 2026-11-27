@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'auth/auth_gate.dart';
@@ -9,6 +10,7 @@ import 'data/game_store.dart';
 import 'firebase_options.dart';
 import 'ui/app_settings.dart';
 import 'ui/theme.dart';
+import 'ui/tutorial_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,7 +28,10 @@ Future<void> main() async {
 
 class TicTacToeArenaApp extends StatelessWidget {
   TicTacToeArenaApp(
-      {super.key, required this.auth, required this.store, AppSettings? settings})
+      {super.key,
+      required this.auth,
+      required this.store,
+      AppSettings? settings})
       : settings = settings ?? AppSettings();
 
   final FirebaseAuth auth;
@@ -45,8 +50,14 @@ class TicTacToeArenaApp extends StatelessWidget {
           theme: arenaTheme(Brightness.light),
           darkTheme: arenaTheme(Brightness.dark),
           themeMode: settings.themeMode,
+          // Urdu turns the layout right-to-left (REQ-UX-06).
+          locale: Locale(settings.urdu ? 'ur' : 'en'),
+          supportedLocales: const [Locale('en'), Locale('ur')],
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
           builder: (context, child) => ArenaBackground(child: child!),
-          home: AuthGate(auth: auth, store: store),
+          home: settings.tutorialSeen
+              ? AuthGate(auth: auth, store: store)
+              : TutorialScreen(onDone: () => settings.tutorialSeen = true),
         ),
       ),
     );
