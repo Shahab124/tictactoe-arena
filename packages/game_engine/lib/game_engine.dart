@@ -117,6 +117,7 @@ class Game {
   // directions (D3 REQ-PLAT-08.1).
   void _updateStatus(int row, int col) {
     final mark = _cells[row][col];
+    // Earlier moves cannot create a new line, so only this move's axes need checking.
     for (final (dr, dc) in const [(0, 1), (1, 0), (1, 1), (1, -1)]) {
       final line = [(row, col)];
       for (final sign in const [1, -1]) {

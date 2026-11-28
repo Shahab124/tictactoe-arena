@@ -38,6 +38,7 @@ class GameRecord {
         'opponent': opponent,
         'moves': [for (final (r, c) in moves) {'r': r, 'c': c}],
         'result': result,
+        // UTC timestamps stay consistent when history is viewed in another time zone.
         'playedAt': playedAt.toUtc().toIso8601String(),
         'firstMark': firstMark,
       };
