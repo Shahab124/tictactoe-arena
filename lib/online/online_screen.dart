@@ -264,8 +264,9 @@ class _RoomScreenState extends State<RoomScreen> {
   }
 
   String _status(Room room, Mark me) {
-    if (room.status == 'waiting')
+    if (room.status == 'waiting') {
       return 'Waiting for a player. Share the code.';
+    }
     if (room.status == 'over') {
       final why = switch (room.reason) {
         'left' => ' (a player left)',
@@ -451,8 +452,9 @@ class _ReportBlockState extends State<_ReportBlock> {
 
   Future<void> _block() async {
     await widget.moderation.block(widget.uid, widget.other);
-    if (mounted)
+    if (mounted) {
       setState(() => _done = 'Blocked. You won\'t be matched with them again.');
+    }
   }
 
   @override

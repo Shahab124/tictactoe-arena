@@ -36,8 +36,9 @@ class _AdminScreenState extends State<AdminScreen> {
             return Center(child: Text(context.tr('Could not load reports.')));
           }
           final reports = snap.data;
-          if (reports == null)
+          if (reports == null) {
             return const Center(child: CircularProgressIndicator());
+          }
           if (reports.isEmpty) {
             return Center(child: Text(context.tr('No open reports.')));
           }
