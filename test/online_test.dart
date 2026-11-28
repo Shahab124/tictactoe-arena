@@ -7,6 +7,8 @@ import 'package:game_engine/game_engine.dart';
 import 'package:tictactoe_arena/online/online_rooms.dart';
 import 'package:tictactoe_arena/online/ratings.dart';
 import 'package:tictactoe_arena/online/online_screen.dart';
+import 'package:tictactoe_arena/ui/app_settings.dart';
+import 'package:tictactoe_arena/ui/strings.dart';
 
 void main() {
   late FakeFirebaseFirestore db;
@@ -182,5 +184,41 @@ void main() {
     expect(find.text('Room $code'), findsOneWidget);
     expect(find.text(code), findsOneWidget);
     expect(find.textContaining('Waiting for a player'), findsOneWidget);
+  });
+
+  testWidgets('online lobby labels are translated when Urdu is selected', (
+    tester,
+  ) async {
+    final settings = AppSettings();
+    await tester.pumpWidget(
+      AppSettingsScope(
+        settings: settings,
+        child: MaterialApp(
+          home: OnlineLobby(
+            rooms: rooms,
+            ratings: Ratings(rooms.firestore),
+            uid: 'ayesha',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Play online'), findsOneWidget);
+
+    settings.urdu = true;
+    await tester.pumpAndSettle();
+
+    expect(find.text('آن لائن کھیلیں'), findsOneWidget);
+    expect(find.text('میچ تلاش کریں'), findsOneWidget);
+    expect(find.text('کمرہ بنائیں'), findsOneWidget);
+    expect(find.text('کمرے کا کوڈ'), findsOneWidget);
+    expect(find.text('کمرے میں شامل ہوں'), findsOneWidget);
+  });
+
+  test('online labels with ratings, rooms and turns are translated', () {
+    expect(toUrdu('Your rating: 1200'), 'آپ کی درجہ بندی: 1200');
+    expect(toUrdu('Room ABCDE'), 'کمرہ ABCDE');
+    expect(toUrdu('Your turn · 60s'), 'آپ کی باری · 60 سیکنڈ');
+    expect(toUrdu('Reported player: omar'), 'رپورٹ کیا گیا کھلاڑی: omar');
   });
 }

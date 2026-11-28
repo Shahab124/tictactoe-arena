@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../ui/strings.dart';
 import 'ratings.dart';
 
 /// Global and weekly leaderboards (REQ-RANK-02). There is no friends list
@@ -20,11 +21,11 @@ class LeaderboardScreen extends StatelessWidget {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Leaderboards'),
-          bottom: const TabBar(
+          title: Text(context.tr('Leaderboards')),
+          bottom: TabBar(
             tabs: [
-              Tab(text: 'All time'),
-              Tab(text: 'This week'),
+              Tab(child: Text(context.tr('All time'))),
+              Tab(child: Text(context.tr('This week'))),
             ],
           ),
         ),
@@ -34,7 +35,7 @@ class LeaderboardScreen extends StatelessWidget {
             _Board(
               load: () => ratings.weekly(uid: uid),
               uid: uid,
-              value: (r) => '${r.weekPoints} pts',
+              value: (r) => context.tr('${r.weekPoints} pts'),
             ),
           ],
         ),
@@ -56,16 +57,20 @@ class _Board extends StatelessWidget {
       future: load(),
       builder: (context, snap) {
         if (snap.hasError) {
-          return const Center(child: Text('Could not load the leaderboard.'));
+          return Center(
+            child: Text(context.tr('Could not load the leaderboard.')),
+          );
         }
         final rows = snap.data;
         if (rows == null) {
           return const Center(child: CircularProgressIndicator());
         }
         if (rows.isEmpty) {
-          return const Center(
+          return Center(
             child: Text(
-              'No ranked games yet. Play online to get on the board.',
+              context.tr(
+                'No ranked games yet. Play online to get on the board.',
+              ),
             ),
           );
         }
@@ -76,9 +81,11 @@ class _Board extends StatelessWidget {
                 selected: rows[i].uid == uid,
                 leading: CircleAvatar(child: Text('${i + 1}')),
                 title: Text(
-                  rows[i].uid == uid ? '${rows[i].name} (you)' : rows[i].name,
+                  rows[i].uid == uid
+                      ? context.tr('${rows[i].name} (you)')
+                      : rows[i].name,
                 ),
-                subtitle: Text('${rows[i].games} games'),
+                subtitle: Text(context.tr('${rows[i].games} games')),
                 trailing: Text(
                   value(rows[i]),
                   style: const TextStyle(

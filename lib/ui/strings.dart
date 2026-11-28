@@ -17,7 +17,9 @@ String toUrdu(String en) {
     final m = pattern.firstMatch(en);
     if (m != null) {
       return urdu.replaceAllMapped(
-          RegExp(r'\$(\d)'), (g) => m.group(int.parse(g.group(1)!)) ?? '');
+        RegExp(r'\$(\d)'),
+        (g) => m.group(int.parse(g.group(1)!)) ?? '',
+      );
     }
   }
   return en;
@@ -33,8 +35,27 @@ final _patterns = [
   (RegExp(r'^vs (.+)$'), r'مقابلہ: $1'),
   (
     RegExp(r'^Password reset email sent to (.+)\.$'),
-    r'پاس ورڈ ری سیٹ ای میل $1 پر بھیج دی گئی۔'
+    r'پاس ورڈ ری سیٹ ای میل $1 پر بھیج دی گئی۔',
   ),
+  (RegExp(r'^Your rating: (\d+)$'), r'آپ کی درجہ بندی: $1'),
+  (RegExp(r'^(\d+) ranked games$'), r'$1 درجہ بند کھیل'),
+  (RegExp(r'^Rejoin game (.+)$'), r'کھیل میں دوبارہ شامل ہوں: $1'),
+  (RegExp(r'^Room (.+)$'), r'کمرہ $1'),
+  (RegExp(r'^You are ([XO])$'), r'آپ $1 ہیں'),
+  (RegExp(r'^Your turn · (\d+)s$'), r'آپ کی باری · $1 سیکنڈ'),
+  (RegExp(r'^Their turn · (\d+)s$'), r'دوسرے کھلاڑی کی باری · $1 سیکنڈ'),
+  (RegExp(r'^You win \(a player left\)$'), 'آپ جیت گئے (ایک کھلاڑی چلا گیا)'),
+  (RegExp(r'^You lose \(a player left\)$'), 'آپ ہار گئے (ایک کھلاڑی چلا گیا)'),
+  (RegExp(r'^You win \(out of time\)$'), 'آپ جیت گئے (وقت ختم)'),
+  (RegExp(r'^You lose \(out of time\)$'), 'آپ ہار گئے (وقت ختم)'),
+  (RegExp(r'^Row (\d+), column (\d+), (X|O)$'), r'قطار $1، کالم $2، $3'),
+  (RegExp(r'^Row (\d+), column (\d+), empty$'), r'قطار $1، کالم $2، خالی'),
+  (RegExp(r'^(.+) \(you\)$'), r'$1 (آپ)'),
+  (RegExp(r'^(\d+) games$'), r'$1 کھیل'),
+  (RegExp(r'^(\d+) pts$'), r'$1 پوائنٹس'),
+  (RegExp(r'^Reported player: (.+)$'), r'رپورٹ کیا گیا کھلاڑی: $1'),
+  (RegExp(r'^By (.+)$'), r'رپورٹ کنندہ: $1'),
+  (RegExp(r'^room (.+)$'), r'کمرہ $1'),
 ];
 
 const _ur = {
@@ -105,6 +126,49 @@ const _ur = {
   'Next game': 'اگلا کھیل',
   'Player X': 'کھلاڑی X',
   'Player O': 'کھلاڑی O',
+  // Online play
+  'Play online': 'آن لائن کھیلیں',
+  'Leaderboards': 'لیڈر بورڈز',
+  'Admin dashboard': 'ایڈمن ڈیش بورڈ',
+  'Your account is suspended, so you cannot play online.':
+      'آپ کا اکاؤنٹ معطل ہے، اس لیے آپ آن لائن نہیں کھیل سکتے۔',
+  'Find a match': 'میچ تلاش کریں',
+  'Create room': 'کمرہ بنائیں',
+  'Room code': 'کمرے کا کوڈ',
+  'Join room': 'کمرے میں شامل ہوں',
+  'Waiting for a player. Share the code.':
+      'کھلاڑی کا انتظار ہے۔ کوڈ شیئر کریں۔',
+  'Draw': 'برابر',
+  'You win': 'آپ جیت گئے',
+  'You lose': 'آپ ہار گئے',
+  'Their turn': 'دوسرے کھلاڑی کی باری',
+  'Leave (you lose)': 'چھوڑیں (آپ ہار جائیں گے)',
+  'Claim win': 'جیت کا دعویٰ کریں',
+  'Looking for a player near your rating…':
+      'آپ کی درجہ بندی کے قریب کھلاڑی تلاش کیا جا رہا ہے…',
+  'The range widens the longer you wait.':
+      'انتظار جتنا طویل ہوگا، درجہ بندی کی حد اتنی بڑھے گی۔',
+  'Cancel': 'منسوخ کریں',
+  'Could not load the leaderboard.': 'لیڈر بورڈ لوڈ نہیں ہو سکا۔',
+  'No ranked games yet. Play online to get on the board.':
+      'ابھی کوئی درجہ بند کھیل نہیں۔ لیڈر بورڈ میں آنے کے لیے آن لائن کھیلیں۔',
+  'All time': 'اب تک',
+  'This week': 'اس ہفتے',
+  'Could not load reports.': 'رپورٹس لوڈ نہیں ہو سکیں۔',
+  'No open reports.': 'کوئی زیرِ التوا رپورٹ نہیں۔',
+  'Dismiss': 'خارج کریں',
+  'Suspend': 'معطل کریں',
+  'Report player': 'کھلاڑی کی رپورٹ کریں',
+  'What happened? (optional)': 'کیا ہوا؟ (اختیاری)',
+  'Report': 'رپورٹ کریں',
+  'Block': 'بلاک کریں',
+  'Reported. An admin will review it.':
+      'رپورٹ بھیج دی گئی۔ ایڈمن اس کا جائزہ لے گا۔',
+  "Blocked. You won't be matched with them again.":
+      'بلاک کر دیا گیا۔ آپ کا دوبارہ اس کھلاڑی سے میچ نہیں ہوگا۔',
+  'No room with that code.': 'اس کوڈ کا کوئی کمرہ نہیں۔',
+  'That room is full.': 'یہ کمرہ بھر چکا ہے۔',
+  'Could not make a room. Try again.': 'کمرہ نہیں بن سکا۔ دوبارہ کوشش کریں۔',
   // History
   'Could not load your games.': 'آپ کے کھیل لوڈ نہیں ہو سکے۔',
   'No games played yet.': 'ابھی کوئی کھیل نہیں کھیلا گیا۔',
@@ -133,11 +197,9 @@ const _ur = {
   'Get three marks in a row, column or diagonal before the other player.':
       'دوسرے کھلاڑی سے پہلے قطار، کالم یا ترچھی لائن میں تین نشان بنائیں۔',
   'Five in a row wins on 8×8': '8×8 پر لگاتار پانچ جیتتے ہیں',
-  'The big board needs five in a row (or four, if you choose it). Pinch to zoom on a phone.':
-      'بڑے بورڈ پر لگاتار پانچ چاہئیں (یا چار، اگر آپ چنیں)۔ فون پر بڑا کرنے کے لیے چٹکی لیں۔',
+  'The big board needs five in a row (or four, if you choose it). Pinch to zoom on a phone.': 'بڑے بورڈ پر لگاتار پانچ چاہئیں (یا چار، اگر آپ چنیں)۔ فون پر بڑا کرنے کے لیے چٹکی لیں۔',
   'Play your way': 'اپنی مرضی سے کھیلیں',
-  'Play a friend on one device, the computer from Easy to Expert, or online with a room code.':
-      'ایک ڈیوائس پر دوست کے ساتھ، آسان سے ماہر تک کمپیوٹر کے ساتھ، یا روم کوڈ سے آن لائن کھیلیں۔',
+  'Play a friend on one device, the computer from Easy to Expert, or online with a room code.': 'ایک ڈیوائس پر دوست کے ساتھ، آسان سے ماہر تک کمپیوٹر کے ساتھ، یا روم کوڈ سے آن لائن کھیلیں۔',
   'Next': 'آگے',
   'Skip': 'چھوڑیں',
   "Let's play": 'چلیں کھیلیں',
