@@ -27,6 +27,8 @@ flutter run -d chrome
 
 - `flutter create` only adds the platform folders (`android/`, `web/`, ...), which are not stored in the repo. It does not change our code.
 - To run on an Android phone, turn on USB debugging, plug it in and use `flutter run` instead of `flutter run -d chrome`. To build an installable APK: `flutter build apk --release`.
+- Windows desktop is not built by CI. To try it locally, install Visual Studio 2022 with the **Desktop development with C++** workload, run `flutter doctor`, then run `flutter run -d windows` if Flutter lists Windows as an available device. You can try `flutter build windows --release` to build it.
+- For web development, run `flutter run -d chrome`. To serve a built web artifact, extract it, open a terminal in the folder containing `index.html`, and run `py -m http.server 8000`; then open `http://localhost:8000`.
 - No Firebase setup is needed. The app connects to our Firebase project through `lib/firebase_options.dart`. You can sign up with an email, or choose **Play as guest** to play without an account.
 
 Run the tests:
@@ -159,7 +161,53 @@ It prints:
 
 ## Download the app
 
-Every pull request and every merge to `main` also builds a release Android APK and the web version. Open the **Actions** tab on GitHub, pick the latest **CI** run on `main`, and download `tictactoe-arena-apk` or `tictactoe-arena-web` under **Artifacts** (you must be signed in to GitHub). Unzip the APK artifact and open `app-release.apk` on an Android phone to install it (allow installs from unknown sources). Each build has a new signature, so uninstall the old version before installing a new one.
+Every pull request and every merge to `main` builds an Android APK and the web version. On GitHub, open **Actions**, select the latest successful **CI** run for `main`, then download the `tictactoe-arena-apk` or `tictactoe-arena-web` artifact (you must be signed in to GitHub).
+
+- **Android:** Extract the APK artifact and open `app-release.apk` on your phone. Allow installation from this source if Android asks. Each CI build uses a different debug signing key, so uninstall the old build before installing a new one.
+- **Web:** Extract the web artifact and serve the folder containing `index.html` using the command above. Do not open `index.html` directly as a `file://` URL.
+
+## User guide
+
+### Choose how to play
+
+- **3×3:** Get three marks in a row, column, or diagonal to win.
+- **8×8:** Choose four or five marks in a row to win. Pinch to zoom on a phone.
+- **Two players:** Play locally on one device.
+- **Computer:** Play Easy, Medium, Hard, or Expert. Hard never loses on 3×3; Expert is strongest on 8×8.
+- **Online:** Sign in, then create or join a room with a code, or find a rating-based match. Completed games update ratings and the all-time and weekly leaderboards.
+- **Match options:** Choose X or O, who starts, and a single game or best-of-3/5 series.
+
+### Other features
+
+- **History:** Review results and statistics; unfinished games can be continued.
+- **Replay and hints:** Review a completed game or ask for a suggested move during play.
+- **Settings:** Change the theme, board skin, sound, vibration, and language. Urdu switches the layout right-to-left; colour-blind mode uses blue and orange marks.
+- **Tutorial:** Follow the first-launch walkthrough, or reopen it from **Settings → How to play**.
+- **Reports and blocks:** After an online game, report or block the other player. Blocked players are excluded from matchmaking.
+- **Admin dashboard:** Admins can review reports, suspend a player, or dismiss a report.
+
+### Configure an admin
+
+An administrator must be added by a project maintainer in the Firebase console; the app cannot grant admin access. In **Firestore Database**, create a document in the `admins` collection with the player's Firebase Authentication UID as the document ID. Add a field such as `since: 1`. The player must sign in to that account to see the **Admin dashboard** in the online lobby.
+
+### Known limits
+
+- Online play, matchmaking, leaderboards, and moderation need an internet connection and a signed-in account; guest play is local.
+- A friends leaderboard is not included.
+- Ratings are calculated by the client. Firestore verifies that a player rated a completed game they played, but a determined user could alter the rating calculation. A trusted server-side function would be needed to prevent that.
+- The CI workflow builds Android and web artifacts, not a Windows installer. Windows desktop can be run or built locally with Flutter and the Visual Studio workload above.
+
+### Screenshots
+
+![Home screen](docs/screenshots/home.png)
+
+![Game setup](docs/screenshots/setup.png)
+
+![3×3 game](docs/screenshots/game-3x3.png)
+
+![8×8 game](docs/screenshots/game-8x8.png)
+
+![Settings](docs/screenshots/settings.png)
 
 ## How we work
 
