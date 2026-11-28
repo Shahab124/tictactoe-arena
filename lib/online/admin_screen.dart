@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../ui/strings.dart';
 import 'moderation.dart';
 
 /// Admin dashboard: open reports, with Suspend or Dismiss (REQ-ADM-01, 03).
@@ -27,46 +28,56 @@ class _AdminScreenState extends State<AdminScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Admin dashboard')),
+      appBar: AppBar(title: Text(context.tr('Admin dashboard'))),
       body: FutureBuilder<List<Report>>(
         future: _reports,
         builder: (context, snap) {
           if (snap.hasError) {
-            return const Center(child: Text('Could not load reports.'));
+            return Center(child: Text(context.tr('Could not load reports.')));
           }
           final reports = snap.data;
-          if (reports == null) return const Center(child: CircularProgressIndicator());
-          if (reports.isEmpty) return const Center(child: Text('No open reports.'));
-          return ListView(children: [
-            for (final r in reports)
-              Card(
-                margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: ListTile(
-                  title: Text('Reported player: ${r.reported}'),
-                  subtitle: Text([
-                    'By ${r.reporter}',
-                    if (r.room != null) 'room ${r.room}',
-                    if (r.reason.isNotEmpty) r.reason,
-                  ].join(' · ')),
-                  trailing: Wrap(spacing: 4, children: [
-                    TextButton(
-                      onPressed: () async {
-                        await widget.moderation.dismiss(r, widget.uid);
-                        _reload();
-                      },
-                      child: const Text('Dismiss'),
+          if (reports == null)
+            return const Center(child: CircularProgressIndicator());
+          if (reports.isEmpty) {
+            return Center(child: Text(context.tr('No open reports.')));
+          }
+          return ListView(
+            children: [
+              for (final r in reports)
+                Card(
+                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: ListTile(
+                    title: Text(context.tr('Reported player: ${r.reported}')),
+                    subtitle: Text(
+                      [
+                        context.tr('By ${r.reporter}'),
+                        if (r.room != null) context.tr('room ${r.room}'),
+                        if (r.reason.isNotEmpty) r.reason,
+                      ].join(' · '),
                     ),
-                    FilledButton(
-                      onPressed: () async {
-                        await widget.moderation.suspend(r, widget.uid);
-                        _reload();
-                      },
-                      child: const Text('Suspend'),
+                    trailing: Wrap(
+                      spacing: 4,
+                      children: [
+                        TextButton(
+                          onPressed: () async {
+                            await widget.moderation.dismiss(r, widget.uid);
+                            _reload();
+                          },
+                          child: Text(context.tr('Dismiss')),
+                        ),
+                        FilledButton(
+                          onPressed: () async {
+                            await widget.moderation.suspend(r, widget.uid);
+                            _reload();
+                          },
+                          child: Text(context.tr('Suspend')),
+                        ),
+                      ],
                     ),
-                  ]),
+                  ),
                 ),
-              ),
-          ]);
+            ],
+          );
         },
       ),
     );

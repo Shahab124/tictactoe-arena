@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../ui/strings.dart';
 import 'matchmaking.dart';
 import 'online_rooms.dart';
 import 'online_screen.dart';
@@ -119,7 +120,7 @@ class _MatchScreenState extends State<MatchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Find a match')),
+      appBar: AppBar(title: Text(context.tr('Find a match'))),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -127,15 +128,15 @@ class _MatchScreenState extends State<MatchScreen> {
             const CircularProgressIndicator(),
             const SizedBox(height: 24),
             Text(
-              'Looking for a player near your rating…',
+              context.tr('Looking for a player near your rating…'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            const Text('The range widens the longer you wait.'),
+            Text(context.tr('The range widens the longer you wait.')),
             const SizedBox(height: 24),
             OutlinedButton(
               onPressed: _pairing ? null : _cancel,
-              child: const Text('Cancel'),
+              child: Text(context.tr('Cancel')),
             ),
           ],
         ),
